@@ -1,0 +1,6 @@
+transformers 
+langchain 
+pandas 
+openpyxl 
+torch 
+accelerate
