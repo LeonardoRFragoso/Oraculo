@@ -80,3 +80,5 @@ JABIL
 DMS
 LOGICAL
 EXALOG
+
+streamlit run run.py --server.fileWatcherType=none
