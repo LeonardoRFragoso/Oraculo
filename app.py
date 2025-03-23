@@ -1,98 +1,100 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Script para análise de dados logísticos e geração de insights utilizando um LLM open-source.
-Requisitos:
-- Python 3
-- transformers
-- langchain (com dependências community: pip install langchain[community])
-- langchain-community (pip install -U langchain-community)
-- pandas
-- openpyxl
-- torch
-- accelerate
-
-Para instalar todas as dependências necessárias, execute:
-pip install transformers langchain[community] langchain-community pandas openpyxl torch accelerate
-"""
-
+import streamlit as st
 import pandas as pd
-from langchain_core.prompts import PromptTemplate  # Import atualizado para evitar warning
-from langchain.chains import LLMChain             # Import atualizado para evitar warning
-from langchain_community.llms import HuggingFacePipeline  # Import atualizado conforme aviso
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-import torch
+import openai
 
-def main():
-    # Etapa 1: Carregar os dados das planilhas (certifique-se de que os arquivos estão no mesmo diretório)
+# Configure sua chave da API da OpenAI
+openai.api_key = "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"
+
+@st.cache_data
+def load_data():
+    # Altere o caminho conforme necessário
+    df = pd.read_excel(r"C:\Users\leona\OneDrive\Documentos\Oraculo-Comercial\Dados_Consolidados.xlsx")
+    
+    # Converte colunas do tipo object para string, se necessário
+    for col in df.select_dtypes(include=['object']).columns:
+        if not df[col].map(lambda x: isinstance(x, str)).all():
+            df[col] = df[col].astype(str)
+    
+    # Tenta converter a coluna "ANO/MÊS" para datetime e salva em uma nova coluna
     try:
-        df_import = pd.read_excel('importação.xlsx')
-        df_export = pd.read_excel('exportação.xlsx')
-        df_cabotagem = pd.read_excel('cabotagem.xlsx')
+        df["ANO/MÊS_parsed"] = pd.to_datetime(df["ANO/MÊS"], errors="coerce")
     except Exception as e:
-        print("Erro ao carregar as planilhas:", e)
-        return
+        st.error(f"Erro ao converter 'ANO/MÊS' para datetime: {e}")
+        df["ANO/MÊS_parsed"] = pd.NaT
 
-    # Etapa 2: Concatenar os dados em um único DataFrame e exibir as primeiras linhas
-    dados_gerais = pd.concat([df_import, df_export, df_cabotagem], ignore_index=True)
-    print("Planilhas carregadas e dados concatenados com sucesso.")
-    print("Visualizando as primeiras linhas dos dados:")
-    print(dados_gerais.head())
+    return df
 
-    # Limitar os dados enviados ao LLM para evitar sobrecarga
-    dados_logisticos = dados_gerais.head(50).to_string()
+df = load_data()
 
-    # Etapa 3: Carregar as informações dos clientes a partir do arquivo clientes.txt
-    try:
-        with open("clientes.txt", "r", encoding="utf-8") as f:
-            dados_clientes = f.read()
-    except Exception as e:
-        print("Erro ao carregar o arquivo clientes.txt:", e)
-        dados_clientes = "Nenhuma informação disponível."
+st.title("Oráculo Comercial")
+st.write("Visualização dos dados comerciais:")
+st.dataframe(df)
 
-    # Etapa 4: Configurar o modelo LLM via Hugging Face
-    # Utilizando o modelo "tiiuae/falcon-7b-instruct" que é público e não requer autenticação.
-    model_name = "tiiuae/falcon-7b-instruct"
-    print(f"\nCarregando o modelo: {model_name}")
+# Seção de depuração para visualizar os valores únicos das colunas de interesse
+with st.expander("Depurar valores das colunas"):
+    st.write("Valores únicos em PORTO DE DESCARGA:", df["PORTO DE DESCARGA"].unique())
+    st.write("Valores únicos em ANO/MÊS:", df["ANO/MÊS"].unique())
+    st.write("Valores únicos em ANO/MÊS_parsed (convertidos):", df["ANO/MÊS_parsed"].dropna().unique())
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16,  # Utilize torch.float16 para maior compatibilidade com a maioria das GPUs
-        device_map="auto"
-    )
+st.write("Faça sua pergunta sobre os dados:")
+user_question = st.text_input("Pergunta:")
 
-    generation_pipe = pipeline(
-        "text-generation",
-        model=model,
-        tokenizer=tokenizer,
-        max_new_tokens=512,
-        temperature=0.7,
-    )
-
-    llm = HuggingFacePipeline(pipeline=generation_pipe)
-
-    # Etapa 5: Criar o prompt para gerar insights, combinando dados logísticos e informações dos clientes
-    prompt_template = (
-        "Você é um analista especialista em logística portuária, comércio exterior e gestão de clientes.\n"
-        "Analise os dados logísticos e as informações dos clientes abaixo e sugira insights detalhados sobre:\n"
-        "- Estratégias para captar novos clientes;\n"
-        "- Como aumentar a quantidade de contêineres alocados pelos clientes atuais em relação ao total movimentado;\n"
-        "- Estratégias para melhorar o atendimento e otimizar a operação logística.\n\n"
-        "Dados Logísticos:\n{dados_logisticos}\n\n"
-        "Informações dos Clientes:\n{dados_clientes}\n\n"
-        "Insights:"
-    )
-    prompt = PromptTemplate(template=prompt_template, input_variables=["dados_logisticos", "dados_clientes"])
-
-    chain = LLMChain(prompt=prompt, llm=llm)
-
-    # Etapa 6: Gerar e exibir os insights
-    print("\nGerando insights com base nos dados e informações dos clientes...")
-    resultado = chain.run({"dados_logisticos": dados_logisticos, "dados_clientes": dados_clientes})
-
-    print("\n--- Insights Gerados ---\n")
-    print(resultado)
-
-if __name__ == '__main__':
-    main()
+if st.button("Responder"):
+    if user_question:
+        question_lower = user_question.lower()
+        # Se a pergunta for sobre containers no porto do Rio de Janeiro em fevereiro de 2025,
+        # tentamos filtrar os dados diretamente.
+        if ("rio de janeiro" in question_lower and "fevereiro" in question_lower and "2025" in question_lower 
+            and "container" in question_lower):
+            try:
+                # Filtro para o porto
+                filtro_porto = df["PORTO DE DESCARGA"].str.lower().str.contains("rio de janeiro", na=False)
+                
+                # Tenta filtrar usando a coluna convertida para datetime, se houver registros válidos
+                if df["ANO/MÊS_parsed"].notna().any():
+                    filtro_data = (df["ANO/MÊS_parsed"].dt.year == 2025) & (df["ANO/MÊS_parsed"].dt.month == 2)
+                else:
+                    # Se a conversão para datetime não foi possível, tenta um filtro alternativo por string
+                    filtro_data = (df["ANO/MÊS"].str.contains("2025-02", na=False)) | (df["ANO/MÊS"].str.contains("2025/02", na=False))
+                
+                filtered_df = df[filtro_porto & filtro_data]
+                
+                st.write("Registros encontrados:", filtered_df.shape[0])
+                
+                if filtered_df.empty:
+                    st.warning("Nenhum dado encontrado para o filtro especificado. Verifique os valores e formatos nas colunas.")
+                else:
+                    # Agrupa por empresa e soma a quantidade de containers
+                    resultado = filtered_df.groupby("NOME IMPORTADOR")["QTDE CONTAINER"].sum().reset_index()
+                    resultado = resultado.sort_values(by="QTDE CONTAINER", ascending=False)
+                    top_empresa = resultado.iloc[0]
+                    st.subheader("Resposta:")
+                    st.write(
+                        f"A empresa que mais trouxe containers para o porto do Rio de Janeiro em fevereiro de 2025 foi **{top_empresa['NOME IMPORTADOR']}**, com um total de **{top_empresa['QTDE CONTAINER']}** containers."
+                    )
+            except Exception as e:
+                st.error(f"Erro ao processar os dados: {e}")
+        else:
+            # Para outras perguntas, utiliza a API da OpenAI (GPT-4)
+            colunas = df.columns.tolist()
+            prompt = (
+                f"Você é um especialista em análise de dados comerciais. "
+                f"Considere os dados com as seguintes colunas: {', '.join(colunas)}. "
+                f"Responda à seguinte pergunta sobre esses dados: {user_question}"
+            )
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": "Você é um assistente de análise de dados comerciais."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0
+                )
+                answer = response['choices'][0]['message']['content']
+                st.subheader("Resposta:")
+                st.write(answer)
+            except Exception as e:
+                st.error(f"Erro ao processar a solicitação: {e}")
+    else:
+        st.warning("Por favor, insira uma pergunta.")
