@@ -285,34 +285,54 @@ def responder_consulta_local(pergunta, df):
         return None
 
 def responder_pergunta(pergunta, df):
-    """Tenta responder à pergunta utilizando os dados locais; se necessário, recorre à API do OpenAI."""
+    """Utiliza exclusivamente a API da OpenAI para gerar respostas contextualizadas."""
     try:
-        # Primeiro tenta responder com dados locais
-        resposta_local = responder_consulta_local(pergunta, df)
-        if resposta_local and "Nenhuma informação" not in resposta_local:
-            return resposta_local
+        # Prepara os dados relevantes
+        filtros = interpretar_pergunta(pergunta)
+        df_filtrado = aplicar_filtros(df, filtros)
+        
+        # Prepara o contexto para a API
+        contexto = {
+            "total_registros": len(df_filtrado),
+            "total_containers": df_filtrado["qtd_container"].sum(),
+            "media_containers": df_filtrado["qtd_container"].mean(),
+            "distribuicao_portos": df_filtrado["PORTO EMBARQUE"].value_counts().head(5).to_dict(),
+            "periodo": f"{filtros.get('mes', 'todos os meses')}/{filtros.get('ano', 'todos os anos')}",
+            "cliente": filtros.get('cliente', 'todos os clientes'),
+            "operacao": filtros.get('operacao', 'todas as operações')
+        }
 
-        # Se não conseguiu responder localmente, usa a API do OpenAI
-        resumo_dados = df.describe().to_string()
-        prompt = f"""Como analista de logística portuária, responda à seguinte pergunta usando os dados fornecidos:
-        
-        Pergunta: {pergunta}
-        
-        Dados disponíveis:
-        {resumo_dados}
-        
-        Por favor, forneça uma resposta objetiva e profissional."""
+        # Cria um prompt detalhado para a API
+        prompt = f"""Como analista especialista em logística portuária, responda à seguinte pergunta usando os dados fornecidos:
 
+Pergunta: {pergunta}
+
+Contexto dos Dados:
+- Período analisado: {contexto['periodo']}
+- Cliente: {contexto['cliente']}
+- Tipo de operação: {contexto['operacao']}
+- Total de registros encontrados: {contexto['total_registros']}
+- Total de containers: {contexto['total_containers']:,.0f}
+- Média de containers por operação: {contexto['media_containers']:.2f}
+
+Top 5 Portos de Embarque:
+{chr(10).join([f'- {porto}: {qtd:,.0f} operações' for porto, qtd in contexto['distribuicao_portos'].items()])}
+
+Por favor, forneça uma resposta detalhada e profissional, focando especificamente nos dados solicitados na pergunta."""
+
+        # Faz a chamada para a API
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Você é um analista especialista em logística portuária."},
+                {"role": "system", "content": "Você é um analista especialista em logística portuária com vasta experiência em análise de dados. Suas respostas devem ser objetivas, profissionais e focadas nos dados solicitados."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=256
+            max_tokens=500
         )
+        
         return response['choices'][0]['message']['content']
+        
     except Exception as e:
         st.error(f"Erro ao processar a pergunta: {str(e)}")
         return "Desculpe, não foi possível processar sua pergunta no momento. Por favor, tente novamente."
