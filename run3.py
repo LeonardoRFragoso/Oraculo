@@ -8,6 +8,8 @@ import unicodedata
 from dotenv import load_dotenv
 import hashlib
 from pathlib import Path
+import json
+import time
 
 # Carrega variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -33,6 +35,84 @@ def limpar_qtd_coluna(coluna):
         return float(match.group(1)) if match else 0
 
     return coluna.apply(clean_value)
+
+# Nova função para unificar contagem de containers considerando tipos de operação
+def unificar_contagem_containers(df):
+    """
+    Unifica a contagem de containers considerando diferentes campos
+    """
+    df = df.copy()
+    
+    # Inicializar coluna de quantidade total de containers
+    df['qtd_container'] = 0
+    
+    # Lista de todas as possíveis colunas de quantidade
+    colunas_quantidade = [
+        'QTDE CONTAINER', 'QTDE CONTEINER', 'QUANTIDADE C20', 'QUANTIDADE C40',
+        'C20', 'C40', 'QTDE FCL', 'TEUS'
+    ]
+    
+    # Converter e somar todas as colunas de quantidade disponíveis
+    for col in colunas_quantidade:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+    
+    # Somar C20 e C40 se existirem
+    if 'C20' in df.columns:
+        df['qtd_container'] += df['C20']
+    if 'C40' in df.columns:
+        df['qtd_container'] += df['C40']
+    
+    # Somar QUANTIDADE C20 e QUANTIDADE C40 se existirem
+    if 'QUANTIDADE C20' in df.columns:
+        df['qtd_container'] += df['QUANTIDADE C20']
+    if 'QUANTIDADE C40' in df.columns:
+        df['qtd_container'] += df['QUANTIDADE C40']
+    
+    # Se ainda não há quantidade, tentar QTDE CONTAINER ou QTDE CONTEINER
+    if df['qtd_container'].sum() == 0:
+        if 'QTDE CONTAINER' in df.columns:
+            df['qtd_container'] = df['QTDE CONTAINER']
+        elif 'QTDE CONTEINER' in df.columns:
+            df['qtd_container'] = df['QTDE CONTEINER']
+        elif 'QTDE FCL' in df.columns:
+            df['qtd_container'] = df['QTDE FCL']
+        elif 'TEUS' in df.columns:
+            df['qtd_container'] = df['TEUS']
+    
+    return df
+
+# Função melhorada para padronizar datas
+def padronizar_datas(df):
+    """
+    Padroniza as datas em diferentes formatos e cria colunas de ano e mês
+    """
+    # Lista de possíveis colunas de data
+    data_cols = ['DATA EMBARQUE', 'DATA DE EMBARQUE']
+    
+    data_padronizada = False
+    for col in data_cols:
+        if col in df.columns:
+            try:
+                df['data_embarque_padronizada'] = pd.to_datetime(df[col], errors='coerce')
+                data_padronizada = True
+                break
+            except:
+                continue
+    
+    # Se conseguimos padronizar alguma data
+    if data_padronizada:
+        df['ano'] = df['data_embarque_padronizada'].dt.year
+        df['mes'] = df['data_embarque_padronizada'].dt.month
+        df['ano_mes'] = df['ano'] * 100 + df['mes']
+    # Se não conseguimos, tentar usar ANO/MÊS
+    elif 'ANO/MÊS' in df.columns:
+        df['ANO/MÊS'] = pd.to_numeric(df['ANO/MÊS'], errors='coerce').fillna(0)
+        df['ano'] = df['ANO/MÊS'] // 100
+        df['mes'] = df['ANO/MÊS'] % 100
+        df['ano_mes'] = df['ANO/MÊS']
+    
+    return df
 
 # Configuração da API OpenAI usando variável de ambiente
 openai.api_key = os.getenv('OPENAI_API_KEY')
@@ -171,61 +251,174 @@ def interpretar_pergunta(pergunta):
     """Extrai informações relevantes da pergunta"""
     filtros = {}
     pergunta_lower = normalize_text(pergunta.lower())
-
-    # Detecta operação
-    if "export" in pergunta_lower:
-        filtros["operacao"] = "exportacao"
-    elif "import" in pergunta_lower:
-        filtros["operacao"] = "importacao"
-    elif "cabot" in pergunta_lower:
-        filtros["operacao"] = "cabotagem"
-
-    # Detecção de ano/mês
-    match_ano = re.search(r'\b(20\d{2})\b', pergunta)
-    if match_ano:
-        filtros["ano"] = int(match_ano.group(1))
     
-    meses = {
-        "janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3, "abril": 4,
-        "maio": 5, "junho": 6, "julho": 7, "agosto": 8,
-        "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12
+    # Detectar operação
+    operacoes = {
+        "importacao": ["importa", "import", "importação", "importado", "importados"],
+        "exportacao": ["exporta", "export", "exportação", "exportado", "exportados"],
+        "cabotagem": ["cabot", "cabotagem"]
     }
     
-    for nome, num in meses.items():
-        if nome in pergunta_lower:
+    for operacao, palavras_chave in operacoes.items():
+        if any(palavra in pergunta_lower for palavra in palavras_chave):
+            filtros["operacao"] = operacao
+            break
+    
+    # Detectar ano/mês
+    # Procura por padrões como "2023", "ano de 2023", "em 2023"
+    padrao_ano = r'\b(?:(?:ano|em|de)\s+)?20\d{2}\b'
+    match_ano = re.search(padrao_ano, pergunta)
+    if match_ano:
+        ano = re.search(r'20\d{2}', match_ano.group())
+        if ano:
+            filtros["ano"] = int(ano.group())
+    
+    # Mapeamento de meses incluindo variações comuns
+    meses = {
+        1: ["janeiro", "jan"],
+        2: ["fevereiro", "fev"],
+        3: ["março", "marco", "mar"],
+        4: ["abril", "abr"],
+        5: ["maio", "mai"],
+        6: ["junho", "jun"],
+        7: ["julho", "jul"],
+        8: ["agosto", "ago"],
+        9: ["setembro", "set"],
+        10: ["outubro", "out"],
+        11: ["novembro", "nov"],
+        12: ["dezembro", "dez"]
+    }
+    
+    # Procura por mês na pergunta
+    for num, variantes in meses.items():
+        if any(mes in pergunta_lower for mes in variantes):
             filtros["mes"] = num
             break
-
-    # Detecção de cliente
-    for palavra in ["consignatario", "consignatário", "cliente", "empresa"]:
-        if palavra in pergunta_lower:
-            match = re.search(f"{palavra}\s+([A-Za-z0-9\s&\-\.,]+(?:\s+LTDA)?)", pergunta, flags=re.IGNORECASE)
-            if match:
-                filtros["cliente"] = match.group(1).strip()
-                break
-
+    
+    # Detectar porto
+    portos_variantes = {
+        "RIO DE JANEIRO": ["rio", "rio de janeiro", "rj", "porto do rio"],
+        "SANTOS": ["santos", "porto de santos", "sp"],
+        "PARANAGUA": ["paranagua", "paranaguá", "porto de paranaguá", "pr"],
+        "ITAJAI": ["itajai", "itajaí", "porto de itajaí", "sc"],
+        "VITORIA": ["vitoria", "vitória", "porto de vitória", "es"],
+        "MANAUS": ["manaus", "porto de manaus", "am"],
+        "ITAGUAI": ["itaguai", "itaguaí", "porto de itaguaí", "sepetiba", "rj"],
+        "SUAPE": ["suape", "porto de suape", "pe"],
+        "PECEM": ["pecem", "pecém", "porto do pecém", "ce"],
+        "SALVADOR": ["salvador", "porto de salvador", "ba"]
+    }
+    
+    for porto, variantes in portos_variantes.items():
+        if any(var in pergunta_lower for var in variantes):
+            filtros["porto"] = porto
+            break
+    
     return filtros
 
 def aplicar_filtros(df, filtros):
-    """Aplica os filtros ao DataFrame"""
+    """Aplica filtros ao DataFrame"""
+    if df.empty:
+        return df
+    
     df_filtrado = df.copy()
     
-    if filtros.get("operacao"):
-        df_filtrado = df_filtrado[df_filtrado["tipo_operacao"] == filtros["operacao"]]
-
-    if filtros.get("ano"):
-        df_filtrado = df_filtrado[df_filtrado["ano_mes"].astype(str).str[:4].astype(int) == filtros["ano"]]
-
-    if filtros.get("mes"):
-        df_filtrado = df_filtrado[df_filtrado["ano_mes"].astype(str).str[-2:].astype(int) == filtros["mes"]]
-
-    if filtros.get("cliente"):
-        cliente_normalizado = normalize_text(filtros["cliente"])
-        df_filtrado = df_filtrado[
-            df_filtrado["cliente"].apply(lambda x: normalize_text(str(x)) if pd.notna(x) else "").str.contains(cliente_normalizado, na=False)
+    # Filtro por ano
+    if "ano" in filtros and filtros["ano"]:
+        if "ANO/MÊS" in df_filtrado.columns:
+            df_filtrado = df_filtrado[df_filtrado["ANO/MÊS"].astype(str).str[:4].astype(int) == filtros["ano"]]
+    
+    # Filtro por mês
+    if "mes" in filtros and filtros["mes"]:
+        if "ANO/MÊS" in df_filtrado.columns:
+            df_filtrado = df_filtrado[df_filtrado["ANO/MÊS"].astype(str).str[4:].astype(int) == filtros["mes"]]
+    
+    # Filtro por tipo de operação
+    if "operacao" in filtros and filtros["operacao"]:
+        if "Categoria" in df_filtrado.columns:
+            categoria_map = {
+                "importacao": "Importação",
+                "exportacao": "Exportação",
+                "cabotagem": "Cabotagem"
+            }
+            categoria = categoria_map.get(filtros["operacao"])
+            if categoria:
+                df_filtrado = df_filtrado[df_filtrado["Categoria"] == categoria]
+    
+    # Filtro por porto
+    if "porto" in filtros and filtros["porto"]:
+        porto = filtros["porto"]
+        colunas_porto = [
+            "PORTO DE DESCARGA", "PORTO DESCARGA", "PORTO DE DESTINO", "PORTO DESTINO",
+            "PORTO DE EMBARQUE", "PORTO EMBARQUE", "PORTO DE ORIGEM", "PORTO ORIGEM"
         ]
-
+        
+        mascara_porto = pd.Series(False, index=df_filtrado.index)
+        for col in colunas_porto:
+            if col in df_filtrado.columns:
+                mascara_porto = mascara_porto | df_filtrado[col].str.contains(porto, case=False, na=False)
+        df_filtrado = df_filtrado[mascara_porto]
+    
     return df_filtrado
+
+def prepare_context(df, filtros, max_tokens=3000):
+    """Prepara o contexto dos dados para a API"""
+    if df.empty:
+        return "Não foram encontrados dados para os filtros especificados."
+    
+    # Identificar colunas relevantes para análise
+    colunas_cliente = {
+        'importacao': ["CONSIGNATARIO FINAL", "NOME IMPORTADOR", "CONSIGNATÁRIO"],
+        'exportacao': ["NOME EXPORTADOR"],
+        'cabotagem': ["DESTINATÁRIO", "REMETENTE"]
+    }
+    
+    # Determinar colunas de cliente com base na operação
+    if "operacao" in filtros:
+        cols_cliente = colunas_cliente.get(filtros["operacao"], [])
+    else:
+        cols_cliente = [col for cols in colunas_cliente.values() for col in cols]
+    
+    # Filtrar apenas colunas existentes
+    cols_cliente = [col for col in cols_cliente if col in df.columns]
+    
+    # Agregação por cliente
+    resultados = []
+    if cols_cliente:
+        for col in cols_cliente:
+            if col in df.columns:
+                agg = df.groupby(col)["qtd_container"].sum().sort_values(ascending=False)
+                for cliente, total in agg.items():
+                    if pd.notna(cliente) and cliente != "":
+                        resultados.append((cliente, total))
+    
+    # Ordenar resultados por quantidade total
+    resultados.sort(key=lambda x: x[1], reverse=True)
+    
+    # Preparar contexto
+    contexto = []
+    
+    # Adicionar informações dos filtros
+    if "operacao" in filtros:
+        contexto.append(f"Operação: {filtros['operacao']}")
+    if "ano" in filtros:
+        contexto.append(f"Ano: {filtros['ano']}")
+    if "mes" in filtros:
+        contexto.append(f"Mês: {filtros['mes']}")
+    if "porto" in filtros:
+        contexto.append(f"Porto: {filtros['porto']}")
+    
+    # Adicionar total geral
+    total_containers = df["qtd_container"].sum()
+    contexto.append(f"\nTotal de containers: {total_containers:.0f}")
+    
+    # Adicionar resultados por cliente
+    if resultados:
+        contexto.append("\nResultados por cliente:")
+        for cliente, total in resultados[:5]:  # Top 5 clientes
+            contexto.append(f"- {cliente}: {total:.0f} containers")
+    
+    return "\n".join(contexto)
 
 def responder_consulta_local(pergunta, df):
     """Gera uma resposta baseada nos dados locais"""
@@ -284,112 +477,117 @@ def responder_consulta_local(pergunta, df):
         st.error(f"Erro ao processar consulta local: {str(e)}")
         return None
 
-def responder_pergunta(pergunta, df):
-    """Utiliza exclusivamente a API da OpenAI para gerar respostas contextualizadas."""
+def responder_pergunta(pergunta, df, max_retries=3, timeout=30):
+    """Utiliza a API da OpenAI para gerar respostas contextualizadas"""
     try:
-        # Prepara os dados relevantes
+        # Extrair informações da pergunta
         filtros = interpretar_pergunta(pergunta)
+        
+        # Aplicar filtros aos dados
         df_filtrado = aplicar_filtros(df, filtros)
         
-        # Prepara o contexto para a API
-        contexto = {
-            "total_registros": len(df_filtrado),
-            "total_containers": df_filtrado["qtd_container"].sum(),
-            "media_containers": df_filtrado["qtd_container"].mean(),
-            "distribuicao_portos": df_filtrado["PORTO EMBARQUE"].value_counts().head(5).to_dict(),
-            "periodo": f"{filtros.get('mes', 'todos os meses')}/{filtros.get('ano', 'todos os anos')}",
-            "cliente": filtros.get('cliente', 'todos os clientes'),
-            "operacao": filtros.get('operacao', 'todas as operações')
-        }
-
-        # Cria um prompt detalhado para a API
-        prompt = f"""Como analista especialista em logística portuária, responda à seguinte pergunta usando os dados fornecidos:
-
-Pergunta: {pergunta}
-
-Contexto dos Dados:
-- Período analisado: {contexto['periodo']}
-- Cliente: {contexto['cliente']}
-- Tipo de operação: {contexto['operacao']}
-- Total de registros encontrados: {contexto['total_registros']}
-- Total de containers: {contexto['total_containers']:,.0f}
-- Média de containers por operação: {contexto['media_containers']:.2f}
-
-Top 5 Portos de Embarque:
-{chr(10).join([f'- {porto}: {qtd:,.0f} operações' for porto, qtd in contexto['distribuicao_portos'].items()])}
-
-Por favor, forneça uma resposta detalhada e profissional, focando especificamente nos dados solicitados na pergunta."""
-
-        # Faz a chamada para a API
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "Você é um analista especialista em logística portuária com vasta experiência em análise de dados. Suas respostas devem ser objetivas, profissionais e focadas nos dados solicitados."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=500
-        )
+        # Se não há dados após a filtragem
+        if df_filtrado.empty:
+            return "Não foram encontrados dados que correspondam aos critérios da pergunta."
         
-        return response['choices'][0]['message']['content']
+        # Preparar o contexto com os dados filtrados
+        contexto = prepare_context(df_filtrado, filtros)
+        
+        # Preparar o prompt para a API
+        prompt = f"""Com base nos dados fornecidos abaixo, responda à pergunta: "{pergunta}"
+
+Contexto dos dados:
+{contexto}
+
+Por favor, forneça uma resposta clara e direta, incluindo números específicos quando relevante."""
+        
+        # Configurar a chamada à API
+        messages = [
+            {"role": "system", "content": "Você é um assistente especializado em análise de dados logísticos. Forneça respostas precisas e diretas, incluindo números específicos quando disponíveis."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        # Fazer a chamada à API com retry
+        for attempt in range(max_retries):
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=messages,
+                    temperature=0.5,
+                    max_tokens=500,
+                    timeout=timeout
+                )
+                
+                # Extrair e retornar a resposta
+                resposta = response.choices[0].message.content.strip()
+                return resposta
+                
+            except openai.error.RateLimitError:
+                if attempt == max_retries - 1:
+                    raise
+                time.sleep(2 ** attempt)  # Exponential backoff
+                
+            except openai.error.APIError as e:
+                if attempt == max_retries - 1:
+                    raise
+                time.sleep(1)
         
     except Exception as e:
-        st.error(f"Erro ao processar a pergunta: {str(e)}")
-        return "Desculpe, não foi possível processar sua pergunta no momento. Por favor, tente novamente."
+        st.error(f"Erro ao processar sua pergunta: {str(e)}")
+        return "Desculpe, ocorreu um erro ao processar sua pergunta. Por favor, tente novamente."
 
-# --- 1. Separar múltiplos portos ---
 def padronizar_dados_consolidados(df):
     """
     Padroniza os dados da planilha consolidada
     """
     df = df.copy()
     
-    # Normalizar cliente com base na categoria
+    # Mapeamento de colunas por tipo de operação
     colunas_cliente = {
-        'importacao': ["CONSIGNATARIO FINAL", "CONSOLIDADOR", "CONSIGNATÁRIO", "NOME IMPORTADOR"],
-        'exportacao': ["NOME EXPORTADOR", "CONSIGNATÁRIO"],
-        'cabotagem': ["DESTINATÁRIO", "REMETENTE"]
+        'importacao': {
+            'cliente': ['CONSIGNATARIO FINAL', 'NOME IMPORTADOR', 'CONSIGNATÁRIO'],
+            'porto': ['PORTO DE DESCARGA', 'PORTO DESCARGA', 'PORTO DE DESTINO', 'PORTO DESTINO']
+        },
+        'exportacao': {
+            'cliente': ['NOME EXPORTADOR'],
+            'porto': ['PORTO DE EMBARQUE', 'PORTO EMBARQUE']
+        },
+        'cabotagem': {
+            'cliente': ['DESTINATÁRIO', 'REMETENTE'],
+            'porto': ['PORTO DE ORIGEM', 'PORTO ORIGEM', 'PORTO DE DESTINO', 'PORTO DESTINO']
+        }
     }
     
-    # Criar coluna cliente baseada na categoria
-    def get_cliente(row):
-        categoria = row['tipo_operacao']
-        for col in colunas_cliente.get(categoria, []):
-            if col in df.columns and pd.notna(row[col]):
-                return str(row[col])
-        return None
+    # Criar coluna de tipo_operacao baseada na Categoria
+    categoria_mapping = {
+        'Importação': 'importacao',
+        'Exportação': 'exportacao',
+        'Cabotagem': 'cabotagem'
+    }
+    df['tipo_operacao'] = df['Categoria'].map(categoria_mapping)
     
-    df['cliente'] = df.apply(get_cliente, axis=1)
-    
+    # Processar ANO/MÊS
+    if 'ANO/MÊS' in df.columns:
+        df['ANO/MÊS'] = pd.to_numeric(df['ANO/MÊS'].astype(str), errors='coerce')
+        df['ano'] = df['ANO/MÊS'].astype(str).str[:4].astype(int)
+        df['mes'] = df['ANO/MÊS'].astype(str).str[4:].astype(int)
+
     # Normalizar nomes de portos
-    colunas_porto = [col for col in df.columns if "PORTO" in col]
+    colunas_porto = [
+        'PORTO DE DESCARGA', 'PORTO DESCARGA', 'PORTO DE DESTINO', 'PORTO DESTINO',
+        'PORTO DE EMBARQUE', 'PORTO EMBARQUE', 'PORTO DE ORIGEM', 'PORTO ORIGEM'
+    ]
+    
     for col in colunas_porto:
-        df[col] = df[col].apply(lambda x: normalize_text(str(x)) if pd.notna(x) else None)
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: normalize_text(str(x)) if pd.notna(x) else None)
     
-    # Tratamento da coluna ANO/MÊS
-    if "ANO/MÊS" in df.columns:
-        df["ano_mes"] = pd.to_numeric(df["ANO/MÊS"].astype(str).str.replace(r'\D', '', regex=True), errors="coerce")
-    
-    # Tratamento de quantidade de containers
-    def get_qtd_container(row):
-        if row['tipo_operacao'] == 'cabotagem':
-            qtd_c20 = limpar_qtd_coluna(pd.Series([row.get("QUANTIDADE C20", 0)])).iloc[0]
-            qtd_c40 = limpar_qtd_coluna(pd.Series([row.get("QUANTIDADE C40", 0)])).iloc[0]
-            return qtd_c20 + qtd_c40
-        else:
-            for col in ["QTDE CONTEINER", "QUANTIDADE CONTAINER"]:
-                if col in df.columns and pd.notna(row[col]):
-                    return limpar_qtd_coluna(pd.Series([row[col]])).iloc[0]
-            # Fallback para C20 + C40
-            qtd_c20 = limpar_qtd_coluna(pd.Series([row.get("C20", 0)])).iloc[0]
-            qtd_c40 = limpar_qtd_coluna(pd.Series([row.get("C40", 0)])).iloc[0]
-            return qtd_c20 + qtd_c40
-    
-    df['qtd_container'] = df.apply(get_qtd_container, axis=1)
+    # Unificar contagem de containers
+    df = unificar_contagem_containers(df)
     
     return df
 
-@st.cache_data(ttl=3600, show_spinner=False)  # Cache por 1 hora, sem mostrar spinner do cache
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_file_hash(file_path):
     """Calcula o hash do arquivo para detectar mudanças"""
     file_path = Path(file_path)
@@ -400,51 +598,56 @@ def get_file_hash(file_path):
         file_hash = hashlib.md5(f.read()).hexdigest()
     return file_hash
 
-@st.cache_data(ttl=3600, show_spinner=False)  # Cache por 1 hora, sem mostrar spinner do cache
+@st.cache_data(ttl=3600, show_spinner=False)
 def carregar_planilhas():
     """
     Carrega a planilha consolidada com todos os dados
     Usa cache do Streamlit para evitar recarregamento desnecessário
     """
     try:
-        # Verifica se houve mudança no arquivo
+        # Verificar se o arquivo existe
         file_path = 'Dados_Consolidados.xlsx'
-        current_hash = get_file_hash(file_path)
+        if not os.path.exists(file_path):
+            st.error(f"Arquivo não encontrado: {file_path}")
+            return pd.DataFrame()
+
+        # Carregar o arquivo
+        df = pd.read_excel(file_path)
         
-        # Se o hash mudou ou não existe no cache, recarrega os dados
-        if 'file_hash' not in st.session_state or st.session_state.file_hash != current_hash:
-            # Carrega a planilha consolidada
-            df = pd.read_excel(file_path)
-            
-            # Padroniza os tipos de operação para manter compatibilidade
-            categoria_mapping = {
-                'Importação': 'importacao',
-                'Exportação': 'exportacao',
-                'Cabotagem': 'cabotagem'
-            }
-            
-            # Mapeia a coluna Categoria para tipo_operacao
-            df['tipo_operacao'] = df['Categoria'].map(categoria_mapping)
-            
-            # Padroniza os dados
-            df = padronizar_dados_consolidados(df)
-            
-            # Atualiza o hash no cache
-            st.session_state.file_hash = current_hash
-            st.session_state.df = df
-            
-            # Debug: Exibe o total de registros por operação em um expander
-            with st.expander("📊 Estatísticas dos Dados", expanded=False):
-                st.write("Total de registros por operação:")
-                st.write(df.groupby("tipo_operacao")["qtd_container"].sum())
+        # Verificar se há dados
+        if df.empty:
+            st.error("A planilha está vazia")
+            return df
+
+        # Padronizar os dados
+        df = padronizar_dados_consolidados(df)
         
-        return st.session_state.df
+        # Criar coluna de tipo_operacao baseada na Categoria
+        categoria_mapping = {
+            'Importação': 'importacao',
+            'Exportação': 'exportacao',
+            'Cabotagem': 'cabotagem'
+        }
+        df['tipo_operacao'] = df['Categoria'].map(categoria_mapping)
+
+        # Unificar contagem de containers
+        df = unificar_contagem_containers(df)
         
+        # Padronizar datas
+        df = padronizar_datas(df)
+        
+        # Criar colunas de ano e mês a partir de ANO/MÊS se existir
+        if 'ANO/MÊS' in df.columns:
+            df['ano'] = df['ANO/MÊS'].astype(str).str[:4].astype(int)
+            df['mes'] = df['ANO/MÊS'].astype(str).str[4:].astype(int)
+
+        return df
+
     except Exception as e:
-        st.error(f"Erro ao carregar a planilha consolidada: {e}")
+        st.error(f"Erro ao carregar os dados: {str(e)}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=3600, show_spinner=False)  # Cache por 1 hora, sem mostrar spinner do cache
+@st.cache_data(ttl=3600, show_spinner=False)
 def carregar_clientes():
     """Carrega e mantém em cache os dados dos clientes"""
     try:

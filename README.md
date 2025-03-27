@@ -1,110 +1,83 @@
 # 🤖 Oráculo - Sistema de Análise de Dados Logísticos
 
-Sistema inteligente para análise de dados logísticos portuários, permitindo consultas em linguagem natural sobre operações de importação, exportação e cabotagem.
+Sistema de análise de dados logísticos com interface conversacional usando Streamlit e OpenAI GPT-4.
 
-## 📋 Funcionalidades
+## 📋 Estrutura do Projeto
 
-- Análise unificada de dados de importação, exportação e cabotagem
-- Consultas em linguagem natural
-- Análise temporal de dados
-- Insights automáticos sobre operações
-- Visualização de tendências e padrões
-- Suporte a análises complexas via GPT-4
+```
+.
+├── src/
+│   ├── __init__.py
+│   ├── api_response.py      # Interação com a API OpenAI
+│   ├── context_builder.py   # Construção do contexto para a API
+│   ├── data_loader.py       # Carregamento e cache de dados
+│   ├── data_processing.py   # Processamento e normalização dos dados
+│   ├── filters.py          # Aplicação de filtros aos dados
+│   └── query_interpreter.py # Interpretação de perguntas
+├── run3.py                 # Aplicação principal
+├── requirements.txt        # Dependências do projeto
+└── README.md              # Este arquivo
+```
+
+## 🚀 Requisitos
+
+- Python 3.8+
+- Dependências listadas em requirements.txt
+- Arquivo de dados consolidados (dados_consolidados.xlsx)
+- Chave de API da OpenAI
 
 ## 🚀 Configuração
 
-1. **Pré-requisitos**
-   - Python 3.8+
-   - pip (gerenciador de pacotes Python)
+1. **Instale as dependências**:
+```bash
+pip install -r requirements.txt
+```
 
-2. **Instalação**
-   ```bash
-   # Clone o repositório
-   git clone [URL_DO_REPOSITORIO]
-   cd Oraculo
+2. **Configure a chave da API OpenAI**:
+```bash
+export OPENAI_API_KEY=sua-chave-aqui
+```
 
-   # Crie e ative um ambiente virtual
-   python -m venv venv
-   source venv/bin/activate  # Linux/Mac
-   .\venv\Scripts\activate   # Windows
+## 💡 Uso
 
-   # Instale as dependências
-   pip install -r requirements.txt
-   ```
+Execute a aplicação com:
+```bash
+streamlit run run3.py
+```
 
-3. **Configuração do Ambiente**
-   - Crie um arquivo `.env` na raiz do projeto
-   - Adicione sua chave da API OpenAI:
-     ```
-     OPENAI_API_KEY=sua_chave_aqui
-     ```
+A interface web será aberta automaticamente no seu navegador.
 
-4. **Dados Necessários**
-   - `Dados_Consolidados.xlsx`: Planilha principal com todos os dados
-   - `clientes.txt`: Informações adicionais sobre clientes (opcional)
+## 📊 Funcionalidades
 
-## 💡 Como Usar
+- Análise de dados de importação, exportação e cabotagem
+- Contagem unificada de containers
+- Filtragem por:
+  - Tipo de operação
+  - Período (ano/mês)
+  - Porto
+  - Cliente
+- Interface conversacional natural
+- Respostas contextualizadas usando GPT-4
 
-1. **Iniciar o Sistema**
-   ```bash
-   streamlit run run3.py
-   ```
+## 📈 Manutenção
 
-2. **Exemplos de Perguntas**
-   - "Quantos containers foram movimentados em março de 2025?"
-   - "Na operação de importação, qual empresa mais trouxe containers para o porto do Rio de Janeiro em fevereiro de 2025?"
-   - "Na operação de exportação, quantos containers foram exportados a partir do porto de embarque do Rio de Janeiro?"
+O código foi modularizado para facilitar a manutenção e extensão. Cada módulo tem uma responsabilidade específica:
 
-## 📊 Análises Disponíveis
-
-- **Volumetria**
-  - Quantidade de containers
-  - TEUs
-  - Peso bruto
-  - Volumes
-
-- **Temporal**
-  - Análises por ano/mês
-  - Tendências
-  - Comparações período a período
-
-- **Operacional**
-  - Tipos de carga
-  - Tipos de container
-  - Rotas e portos
-
-- **Comercial**
-  - Análise por cliente
-  - Market share
-  - Concentração de operações
-
-## 🔒 Segurança
-
-- Dados sensíveis protegidos via variáveis de ambiente
-- Sem exposição de chaves de API no código
-- Controle de acesso aos dados
-
-## 📝 Notas Importantes
-
-1. **Arquivos de Dados**
-   - Não compartilhe os arquivos de dados (.xlsx, .txt)
-   - Mantenha backup dos dados importantes
-
-2. **Configuração da API**
-   - Nunca compartilhe sua chave da API OpenAI
-   - Monitore o uso da API para controle de custos
-
-3. **Manutenção**
-   - Atualize regularmente as dependências
-   - Faça backup do arquivo .env
+- `data_processing.py`: Normalização e processamento dos dados
+- `query_interpreter.py`: Interpretação de perguntas em linguagem natural
+- `filters.py`: Aplicação de filtros aos dados
+- `context_builder.py`: Construção do contexto para a API
+- `api_response.py`: Interação com a API OpenAI
+- `data_loader.py`: Carregamento e cache de dados
 
 ## 🤝 Contribuição
 
 Para contribuir com o projeto:
-1. Faça um Fork
+
+1. Faça um fork do repositório
 2. Crie uma branch para sua feature
-3. Commit suas mudanças
-4. Push para a branch
+3. Faça commit das suas alterações
+4. Faça push para a branch
 5. Abra um Pull Request
 
 ## 📄 Licença
