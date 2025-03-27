@@ -3,99 +3,122 @@ Módulo responsável por aplicar filtros aos dados
 """
 import pandas as pd
 from datetime import datetime
-from .config import PORTO_MAPPING, CLIENTE_MAPPING
 from .data_processing import normalize_text
 
-def encontrar_colunas_porto(df, tipo_porto=None):
-    """
-    Encontra todas as colunas de porto disponíveis no DataFrame.
-    Se tipo_porto for especificado, retorna apenas as colunas daquele tipo.
-    """
-    colunas_porto = []
-    
-    # Se tipo_porto não for especificado, buscar em todas as categorias
-    categorias = [tipo_porto] if tipo_porto else PORTO_MAPPING.keys()
-    
-    for categoria in categorias:
-        for coluna in PORTO_MAPPING[categoria]:
-            if coluna in df.columns:
-                colunas_porto.append(coluna)
-    
-    return list(set(colunas_porto))  # Remover duplicatas
-
 def aplicar_filtros(df, filtros):
-    """Aplica filtros ao DataFrame com base nos critérios fornecidos"""
-    if df.empty or not filtros:
+    """Aplica os filtros ao DataFrame"""
+    if not filtros or df.empty:
         return df
     
     df_filtrado = df.copy()
     
-    # Filtrar por ano
-    if filtros.get('ano'):
-        colunas_data = [col for col in df.columns if 'data' in col.lower()]
-        if colunas_data:
-            df_filtrado = df_filtrado[
-                df_filtrado[colunas_data[0]].dt.year == filtros['ano']
-            ]
-    
-    # Filtrar por mês
-    if filtros.get('mes'):
-        colunas_data = [col for col in df.columns if 'data' in col.lower()]
-        if colunas_data:
-            df_filtrado = df_filtrado[
-                df_filtrado[colunas_data[0]].dt.month == filtros['mes']
-            ]
+    # Filtrar por cliente
+    if 'cliente' in filtros:
+        cliente = normalize_text(filtros['cliente'])
+        mask = pd.Series(False, index=df.index)
+        
+        # Verificar em todas as colunas de cliente
+        colunas_cliente = [
+            'CONSIGNATARIO FINAL', 'CONSIGNATÁRIO', 'NOME IMPORTADOR',
+            'NOME EXPORTADOR', 'DESTINATÁRIO', 'REMETENTE'
+        ]
+        
+        for col in colunas_cliente:
+            if col in df.columns:
+                mask |= df[col].fillna('').str.contains(cliente, case=False, na=False)
+        
+        df_filtrado = df_filtrado[mask]
     
     # Filtrar por porto
-    if filtros.get('porto'):
-        porto = normalize_text(str(filtros['porto']))
-        colunas_porto = encontrar_colunas_porto(df_filtrado)
+    if 'porto' in filtros:
+        porto = normalize_text(filtros['porto'])
+        mask = pd.Series(False, index=df.index)
         
-        # Criar máscara para filtrar por porto em qualquer coluna
-        mascara_porto = pd.Series(False, index=df_filtrado.index)
+        # Verificar em todas as colunas de porto
+        colunas_porto = [col for col in df.columns if 'porto' in col.lower()]
         for col in colunas_porto:
-            mascara_porto |= df_filtrado[col].apply(normalize_text) == porto
+            if df[col].dtype == 'object':
+                mask |= df[col].fillna('').str.contains(porto, case=False, na=False)
         
-        df_filtrado = df_filtrado[mascara_porto]
+        df_filtrado = df_filtrado[mask]
     
-    # Filtrar por cliente
-    if filtros.get('cliente'):
-        cliente = normalize_text(str(filtros['cliente']))
-        colunas_cliente = []
-        
-        # Obter todas as colunas de cliente possíveis
-        for tipo in CLIENTE_MAPPING.values():
-            colunas_cliente.extend(tipo)
-        
-        # Remover duplicatas
-        colunas_cliente = list(set(colunas_cliente))
-        
-        # Criar máscara para filtrar por cliente em qualquer coluna
-        mascara_cliente = pd.Series(False, index=df_filtrado.index)
-        for col in colunas_cliente:
-            if col in df_filtrado.columns:
-                mascara_cliente |= df_filtrado[col].apply(normalize_text) == cliente
-        
-        df_filtrado = df_filtrado[mascara_cliente]
+    # Filtrar por ano
+    if 'ano' in filtros:
+        ano = int(filtros['ano'])
+        df_filtrado = df_filtrado[df_filtrado['ano'] == ano]
     
-    # Filtrar por período relativo
-    if filtros.get('periodo_relativo'):
-        hoje = datetime.now()
+    # Filtrar por mês
+    if 'mes' in filtros:
+        mes = int(filtros['mes'])
+        df_filtrado = df_filtrado[df_filtrado['mes'] == mes]
+    
+    # Filtrar por categoria (importação/exportação)
+    if 'categoria' in filtros:
+        categoria = normalize_text(filtros['categoria'])
+        df_filtrado = df_filtrado[df_filtrado['Categoria'].str.contains(categoria, case=False, na=False)]
+    
+    # Filtrar por armador
+    if 'armador' in filtros:
+        armador = normalize_text(filtros['armador'])
+        df_filtrado = df_filtrado[df_filtrado['ARMADOR'].str.contains(armador, case=False, na=False)]
+    
+    # Filtrar por período específico
+    if 'data_inicio' in filtros and 'data_fim' in filtros:
+        data_inicio = pd.to_datetime(filtros['data_inicio'])
+        data_fim = pd.to_datetime(filtros['data_fim'])
+        
+        # Tentar diferentes colunas de data
         colunas_data = [col for col in df.columns if 'data' in col.lower()]
-        
-        if colunas_data:
-            coluna_data = colunas_data[0]
-            if filtros['periodo_relativo'] == 'ultimo':
-                # Último mês completo
-                ultimo_mes = hoje.replace(day=1).replace(hour=0, minute=0, second=0, microsecond=0)
+        for col in colunas_data:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
                 df_filtrado = df_filtrado[
-                    df_filtrado[coluna_data] < ultimo_mes
+                    (df_filtrado[col] >= data_inicio) &
+                    (df_filtrado[col] <= data_fim)
                 ]
-            elif filtros['periodo_relativo'] == 'atual':
-                # Mês atual
-                inicio_mes = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                df_filtrado = df_filtrado[
-                    df_filtrado[coluna_data] >= inicio_mes
-                ]
+                break
     
     return df_filtrado
+
+def filtrar_por_periodo(df, inicio, fim):
+    """Filtra o DataFrame por um período específico"""
+    if df.empty:
+        return df
+    
+    # Converter datas para datetime se necessário
+    inicio = pd.to_datetime(inicio)
+    fim = pd.to_datetime(fim)
+    
+    # Identificar colunas de data
+    colunas_data = [col for col in df.columns if 'data' in col.lower()]
+    
+    # Tentar filtrar por cada coluna de data até encontrar uma válida
+    for col in colunas_data:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            return df[
+                (df[col] >= inicio) &
+                (df[col] <= fim)
+            ]
+    
+    # Se não encontrou coluna de data válida, tentar por ano/mês
+    if 'ano' in df.columns and 'mes' in df.columns:
+        mask = (
+            ((df['ano'] == inicio.year) & (df['mes'] >= inicio.month)) |
+            ((df['ano'] == fim.year) & (df['mes'] <= fim.month)) |
+            ((df['ano'] > inicio.year) & (df['ano'] < fim.year))
+        )
+        return df[mask]
+    
+    return df
+
+def top_n_by_column(df, column, n=10, sort_by=None):
+    """Retorna os top N valores de uma coluna, ordenados por outra coluna opcional"""
+    if df.empty or column not in df.columns:
+        return pd.DataFrame()
+    
+    if sort_by is None:
+        # Se não especificou coluna para ordenar, usar contagem
+        return df[column].value_counts().head(n)
+    
+    # Agrupar por coluna e somar a coluna de ordenação
+    grouped = df.groupby(column)[sort_by].sum().sort_values(ascending=False)
+    return grouped.head(n)

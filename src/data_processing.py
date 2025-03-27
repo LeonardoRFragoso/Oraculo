@@ -15,82 +15,52 @@ def normalize_text(text):
 
 def detectar_formato_data(serie):
     """Detecta o formato da data baseado em uma amostra dos dados"""
-    amostra = serie.dropna().head(100)  # Pegar uma amostra para análise
+    amostra = serie.dropna().head(100)  
     
-    # Tentar diferentes formatos comuns
     formatos = [
-        ('%d/%m/%Y', True),  # BR - dia/mês/ano
-        ('%Y-%m-%d', False), # ISO - ano-mês-dia
-        ('%m/%d/%Y', False), # US - mês/dia/ano
-        ('%Y/%m/%d', False)  # ISO alternativo
+        ('%d/%m/%Y', True),  
+        ('%Y-%m-%d', False), 
+        ('%m/%d/%Y', False), 
+        ('%Y/%m/%d', False),
+        ('%d-%m-%Y', True)
     ]
     
     for fmt, dayfirst in formatos:
         try:
-            # Tentar converter a amostra
             pd.to_datetime(amostra, format=fmt)
             return fmt, dayfirst
         except:
             continue
     
-    # Se nenhum formato específico funcionar, deixar o pandas detectar
     return None, False
 
 def processar_datas(df):
     """Processa todas as colunas de data do DataFrame"""
     df = df.copy()
-    colunas_data = [col for col in df.columns if 'data' in col.lower()]
     
+    # Processar coluna ANO/MÊS
+    if 'ANO/MÊS' in df.columns:
+        try:
+            df['ANO/MÊS'] = pd.to_datetime(df['ANO/MÊS'], format='%Y/%m')
+            df['ano'] = df['ANO/MÊS'].dt.year
+            df['mes'] = df['ANO/MÊS'].dt.month
+        except:
+            pass
+    
+    # Processar outras colunas de data
+    colunas_data = [col for col in df.columns if 'data' in col.lower()]
     for col in colunas_data:
-        if not df[col].isna().all():  # Ignorar colunas vazias
+        if not df[col].isna().all():  
             formato, dayfirst = detectar_formato_data(df[col])
             if formato:
-                # Se detectou um formato específico, usar ele
                 df[col] = pd.to_datetime(df[col], format=formato)
             else:
-                # Caso contrário, deixar o pandas inferir
                 df[col] = pd.to_datetime(df[col], dayfirst=False)
             
-            # Adicionar colunas de ano e mês
-            df['ano'] = df[col].dt.year
-            df['mes'] = df[col].dt.month
-    
-    return df
-
-def limpar_qtd_coluna(coluna):
-    """Limpa e converte valores de quantidade para float"""
-    def clean_value(val):
-        if pd.isna(val):
-            return 0
-        if isinstance(val, (int, float)):
-            return float(val)
-        # Converter string para um formato padrão
-        val = str(val).strip()
-        val = val.replace(".", "").replace(",", ".")
-        match = re.search(r'(\d+\.?\d*)', val)
-        return float(match.group(1)) if match else 0
-    return coluna.apply(clean_value)
-
-def processar_dados(df):
-    """Processa e limpa os dados do DataFrame"""
-    if df.empty:
-        return df
-    
-    # Normalizar nomes das colunas
-    df.columns = [normalize_text(col) for col in df.columns]
-    
-    # Processar datas
-    df = processar_datas(df)
-    
-    # Limpar e converter colunas de quantidade
-    colunas_qtd = [col for col in df.columns if 'qtd' in col.lower() or 'quantidade' in col.lower()]
-    for col in colunas_qtd:
-        df[col] = limpar_qtd_coluna(df[col])
-    
-    # Processar colunas de texto
-    colunas_texto = df.select_dtypes(include=['object']).columns
-    for col in colunas_texto:
-        df[col] = df[col].apply(normalize_text)
+            if 'ano' not in df.columns:
+                df['ano'] = df[col].dt.year
+            if 'mes' not in df.columns:
+                df['mes'] = df[col].dt.month
     
     return df
 
@@ -99,15 +69,72 @@ def unificar_contagem_containers(df, filtros=None):
     if df.empty:
         return 0
     
-    # Identificar colunas de quantidade
-    colunas_qtd = [col for col in df.columns if 'qtd' in col.lower() or 'quantidade' in col.lower()]
+    # Lista de colunas que podem conter contagens
+    colunas_container = [
+        'QTDE CONTAINER', 'QTDE CONTEINER', 'QUANTIDADE TEUS',
+        'C20', 'C40', 'QUANTIDADE C20', 'QUANTIDADE C40'
+    ]
     
-    if not colunas_qtd:
+    # Filtrar apenas colunas que existem no DataFrame
+    colunas_existentes = [col for col in colunas_container if col in df.columns]
+    
+    if not colunas_existentes:
         return 0
     
-    # Somar todas as colunas de quantidade
+    # Priorizar QTDE CONTAINER ou QTDE CONTEINER
+    for col in ['QTDE CONTAINER', 'QTDE CONTEINER']:
+        if col in colunas_existentes:
+            return int(df[col].fillna(0).sum())
+    
+    # Se não encontrou as colunas principais, somar C20 e C40
     total = 0
-    for col in colunas_qtd:
-        total += df[col].sum()
+    if 'C20' in colunas_existentes:
+        total += df['C20'].fillna(0).sum()
+    if 'C40' in colunas_existentes:
+        total += df['C40'].fillna(0).sum() * 2  
+    
+    # Se ainda não encontrou, tentar QUANTIDADE C20 e C40
+    if total == 0:
+        if 'QUANTIDADE C20' in colunas_existentes:
+            total += df['QUANTIDADE C20'].fillna(0).sum()
+        if 'QUANTIDADE C40' in colunas_existentes:
+            total += df['QUANTIDADE C40'].fillna(0).sum() * 2
+    
+    # Se ainda não encontrou, usar QUANTIDADE TEUS
+    if total == 0 and 'QUANTIDADE TEUS' in colunas_existentes:
+        total = df['QUANTIDADE TEUS'].fillna(0).sum()
     
     return int(total)
+
+def processar_dados(df):
+    """Processa e limpa os dados do DataFrame"""
+    if df.empty:
+        return df
+    
+    # Criar cópia para não modificar o original
+    df = df.copy()
+    
+    # Processar datas
+    df = processar_datas(df)
+    
+    # Normalizar textos
+    colunas_texto = df.select_dtypes(include=['object']).columns
+    for col in colunas_texto:
+        df[col] = df[col].apply(normalize_text)
+    
+    # Unificar colunas de porto
+    colunas_porto = [col for col in df.columns if 'porto' in col.lower()]
+    for col in colunas_porto:
+        if df[col].dtype == 'object':
+            df[col] = df[col].apply(normalize_text)
+    
+    # Unificar colunas de cliente/consignatário
+    colunas_cliente = [
+        'CONSIGNATARIO FINAL', 'CONSIGNATÁRIO', 'NOME IMPORTADOR',
+        'NOME EXPORTADOR', 'DESTINATÁRIO', 'REMETENTE'
+    ]
+    for col in colunas_cliente:
+        if col in df.columns:
+            df[col] = df[col].apply(normalize_text)
+    
+    return df
