@@ -4,6 +4,24 @@ Módulo responsável por aplicar filtros aos dados
 import pandas as pd
 from datetime import datetime
 from .config import PORTO_MAPPING, CLIENTE_MAPPING
+from .data_processing import normalize_text
+
+def encontrar_colunas_porto(df, tipo_porto=None):
+    """
+    Encontra todas as colunas de porto disponíveis no DataFrame.
+    Se tipo_porto for especificado, retorna apenas as colunas daquele tipo.
+    """
+    colunas_porto = []
+    
+    # Se tipo_porto não for especificado, buscar em todas as categorias
+    categorias = [tipo_porto] if tipo_porto else PORTO_MAPPING.keys()
+    
+    for categoria in categorias:
+        for coluna in PORTO_MAPPING[categoria]:
+            if coluna in df.columns:
+                colunas_porto.append(coluna)
+    
+    return list(set(colunas_porto))  # Remover duplicatas
 
 def aplicar_filtros(df, filtros):
     """Aplica filtros ao DataFrame com base nos critérios fornecidos"""
@@ -30,41 +48,33 @@ def aplicar_filtros(df, filtros):
     
     # Filtrar por porto
     if filtros.get('porto'):
-        porto = str(filtros['porto']).lower()
-        colunas_porto = []
-        
-        # Obter todas as colunas de porto possíveis
-        for tipo in PORTO_MAPPING.values():
-            colunas_porto.extend([col.lower() for col in tipo])
-        
-        # Remover duplicatas
-        colunas_porto = list(set(colunas_porto))
+        porto = normalize_text(str(filtros['porto']))
+        colunas_porto = encontrar_colunas_porto(df_filtrado)
         
         # Criar máscara para filtrar por porto em qualquer coluna
         mascara_porto = pd.Series(False, index=df_filtrado.index)
-        for col in df_filtrado.columns:
-            if col.lower() in colunas_porto:
-                mascara_porto |= df_filtrado[col].astype(str).str.lower() == porto
+        for col in colunas_porto:
+            mascara_porto |= df_filtrado[col].apply(normalize_text) == porto
         
         df_filtrado = df_filtrado[mascara_porto]
     
     # Filtrar por cliente
     if filtros.get('cliente'):
-        cliente = str(filtros['cliente']).lower()
+        cliente = normalize_text(str(filtros['cliente']))
         colunas_cliente = []
         
         # Obter todas as colunas de cliente possíveis
         for tipo in CLIENTE_MAPPING.values():
-            colunas_cliente.extend([col.lower() for col in tipo])
+            colunas_cliente.extend(tipo)
         
         # Remover duplicatas
         colunas_cliente = list(set(colunas_cliente))
         
         # Criar máscara para filtrar por cliente em qualquer coluna
         mascara_cliente = pd.Series(False, index=df_filtrado.index)
-        for col in df_filtrado.columns:
-            if col.lower() in colunas_cliente:
-                mascara_cliente |= df_filtrado[col].astype(str).str.lower() == cliente
+        for col in colunas_cliente:
+            if col in df_filtrado.columns:
+                mascara_cliente |= df_filtrado[col].apply(normalize_text) == cliente
         
         df_filtrado = df_filtrado[mascara_cliente]
     

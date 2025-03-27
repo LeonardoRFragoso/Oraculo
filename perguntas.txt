@@ -1,0 +1,21 @@
+Aqui estão 5 perguntas de teste que exploram diferentes aspectos do sistema:
+
+Quantos containers foram movimentados pelo consignatário ACCUMED PRODUTOS MEDICO HOSPITALARES LTDA em 2024?
+
+Esta pergunta testa a capacidade de filtrar por cliente específico e período
+
+Qual foi o volume total de importações em março de 2025, considerando todos os portos?
+
+Testa a análise temporal e agregação de dados
+
+Quais são os principais armadores que operaram no porto de Santos em 2024, ordenados por quantidade de containers?
+
+Testa a capacidade de análise por porto, ranking e múltiplas dimensões
+
+Compare o volume de exportações entre janeiro e fevereiro de 2025
+
+Testa a capacidade de análise comparativa entre períodos
+
+Mostre uma análise de tendência do volume de containers movimentados nos últimos 3 meses
+
+Testa a capacidade de análise de tendências e visualização temporal

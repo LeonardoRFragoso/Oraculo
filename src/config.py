@@ -33,24 +33,60 @@ CLIENTE_MAPPING = {
 # Mapeamento de portos
 PORTO_MAPPING = {
     "importacao": [
+        "PORTO DE EMBARQUE",
         "PORTO EMBARQUE",
-        "PORTO DESCARGA",
+        "PORTO DE ORIGEM",
         "PORTO ORIGEM",
+        "PORTO DE ORIGEM COM CÓDIGO",
+        "PORTO ORIGEM COM CÓDIGO",
+        "COD. PORTO EMBARQUE",
+        "COD. PORTO ORIGEM",
+        "PORTO DE DESCARGA",
+        "PORTO DESCARGA",
+        "PORTO DESCARGA COM CÓDIGO",
+        "COD. PORTO DESCARGA",
+        "PORTO DE DESTINO",
         "PORTO DESTINO",
+        "PORTO DESTINO COM CÓDIGO",
+        "COD. PORTO DESTINO",
         "PORTO"
     ],
     "exportacao": [
-        "PORTO DE ORIGEM",
+        "PORTO DE EMBARQUE",
         "PORTO EMBARQUE",
+        "PORTO DE ORIGEM",
+        "PORTO ORIGEM",
+        "PORTO DE ORIGEM COM CÓDIGO",
+        "PORTO ORIGEM COM CÓDIGO",
+        "COD. PORTO EMBARQUE",
+        "COD. PORTO ORIGEM",
+        "PORTO DE DESCARGA",
         "PORTO DESCARGA",
+        "PORTO DESCARGA COM CÓDIGO",
+        "COD. PORTO DESCARGA",
         "PORTO DE DESTINO",
+        "PORTO DESTINO",
+        "PORTO DESTINO COM CÓDIGO",
+        "COD. PORTO DESTINO",
         "PORTO"
     ],
     "cabotagem": [
-        "PORTO DE DESCARGA",
-        "PORTO DE DESTINO",
         "PORTO DE EMBARQUE",
+        "PORTO EMBARQUE",
         "PORTO DE ORIGEM",
+        "PORTO ORIGEM",
+        "PORTO DE ORIGEM COM CÓDIGO",
+        "PORTO ORIGEM COM CÓDIGO",
+        "COD. PORTO EMBARQUE",
+        "COD. PORTO ORIGEM",
+        "PORTO DE DESCARGA",
+        "PORTO DESCARGA",
+        "PORTO DESCARGA COM CÓDIGO",
+        "COD. PORTO DESCARGA",
+        "PORTO DE DESTINO",
+        "PORTO DESTINO",
+        "PORTO DESTINO COM CÓDIGO",
+        "COD. PORTO DESTINO",
         "PORTO"
     ]
 }
@@ -91,8 +127,7 @@ STREAMLIT_CONFIG = {
 
 # Configuração de cache
 CACHE_CONFIG = {
-    "ttl": 3600,  # 1 hora
-    "max_entries": 100
+    "ttl": 3600,  # Tempo de vida do cache em segundos (1 hora)
 }
 
 # Configuração da API OpenAI
