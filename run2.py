@@ -64,8 +64,13 @@ def main():
                 # Interpretar a pergunta e extrair filtros
                 filtros = interpretar_pergunta(pergunta, df)
                 
+                if not filtros:
+                    st.error("Não foi possível interpretar sua pergunta. Por favor, tente reformular.")
+                    return
+                
                 # Gerar resposta
-                resposta = responder_pergunta(pergunta, df, filtros)
+                tipo_analise = filtros.get('tipo_analise', 'total')
+                resposta = responder_pergunta(df, tipo_analise, filtros)
                 
                 # Exibir resposta
                 st.write("📝 Resposta")

@@ -12,70 +12,49 @@ def aplicar_filtros(df, filtros):
     
     df_filtrado = df.copy()
     
+    # Filtrar por categoria (importação/exportação)
+    if filtros.get('categoria'):
+        df_filtrado = df_filtrado.loc[df_filtrado['Categoria'].str.lower() == filtros['categoria'].lower()]
+    
     # Filtrar por cliente
-    if 'cliente' in filtros:
-        cliente = normalize_text(filtros['cliente'])
-        mask = pd.Series(False, index=df.index)
-        
-        # Verificar em todas as colunas de cliente
+    if filtros.get('cliente'):
+        mask = False
         colunas_cliente = [
             'CONSIGNATARIO FINAL', 'CONSIGNATÁRIO', 'NOME IMPORTADOR',
             'NOME EXPORTADOR', 'DESTINATÁRIO', 'REMETENTE'
         ]
-        
         for col in colunas_cliente:
-            if col in df.columns:
-                mask |= df[col].fillna('').str.contains(cliente, case=False, na=False)
-        
-        df_filtrado = df_filtrado[mask]
+            if col in df_filtrado.columns:
+                mask |= df_filtrado[col].str.lower() == filtros['cliente'].lower()
+        df_filtrado = df_filtrado.loc[mask]
     
     # Filtrar por porto
-    if 'porto' in filtros:
-        porto = normalize_text(filtros['porto'])
-        mask = pd.Series(False, index=df.index)
-        
-        # Verificar em todas as colunas de porto
-        colunas_porto = [col for col in df.columns if 'porto' in col.lower()]
+    if filtros.get('porto'):
+        mask = False
+        colunas_porto = [col for col in df_filtrado.columns if 'porto' in col.lower()]
         for col in colunas_porto:
-            if df[col].dtype == 'object':
-                mask |= df[col].fillna('').str.contains(porto, case=False, na=False)
-        
-        df_filtrado = df_filtrado[mask]
-    
-    # Filtrar por ano
-    if 'ano' in filtros:
-        ano = int(filtros['ano'])
-        df_filtrado = df_filtrado[df_filtrado['ano'] == ano]
-    
-    # Filtrar por mês
-    if 'mes' in filtros:
-        mes = int(filtros['mes'])
-        df_filtrado = df_filtrado[df_filtrado['mes'] == mes]
-    
-    # Filtrar por categoria (importação/exportação)
-    if 'categoria' in filtros:
-        categoria = normalize_text(filtros['categoria'])
-        df_filtrado = df_filtrado[df_filtrado['Categoria'].str.contains(categoria, case=False, na=False)]
+            if df_filtrado[col].dtype == 'object':
+                mask |= df_filtrado[col].str.lower() == filtros['porto'].lower()
+        df_filtrado = df_filtrado.loc[mask]
     
     # Filtrar por armador
-    if 'armador' in filtros:
-        armador = normalize_text(filtros['armador'])
-        df_filtrado = df_filtrado[df_filtrado['ARMADOR'].str.contains(armador, case=False, na=False)]
+    if filtros.get('armador'):
+        df_filtrado = df_filtrado.loc[df_filtrado['ARMADOR'].str.lower() == filtros['armador'].lower()]
     
-    # Filtrar por período específico
-    if 'data_inicio' in filtros and 'data_fim' in filtros:
-        data_inicio = pd.to_datetime(filtros['data_inicio'])
-        data_fim = pd.to_datetime(filtros['data_fim'])
-        
-        # Tentar diferentes colunas de data
-        colunas_data = [col for col in df.columns if 'data' in col.lower()]
-        for col in colunas_data:
-            if pd.api.types.is_datetime64_any_dtype(df[col]):
-                df_filtrado = df_filtrado[
-                    (df_filtrado[col] >= data_inicio) &
-                    (df_filtrado[col] <= data_fim)
-                ]
-                break
+    # Filtrar por ano
+    if filtros.get('ano'):
+        df_filtrado = df_filtrado.loc[df_filtrado['ano'] == filtros['ano']]
+    
+    # Filtrar por mês
+    if filtros.get('mes'):
+        df_filtrado = df_filtrado.loc[df_filtrado['mes'] == filtros['mes']]
+    
+    # Filtrar por intervalo de datas
+    if filtros.get('data_inicio') and filtros.get('data_fim'):
+        df_filtrado = df_filtrado.loc[
+            (df_filtrado['ANO/MÊS'] >= filtros['data_inicio']) &
+            (df_filtrado['ANO/MÊS'] <= filtros['data_fim'])
+        ]
     
     return df_filtrado
 
