@@ -8,11 +8,18 @@ import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import openai
-from sentence_transformers import SentenceTransformer
-import faiss
 import pickle
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Importações condicionais para ML
+try:
+    from sentence_transformers import SentenceTransformer
+    import faiss
+    ML_AVAILABLE = True
+except ImportError:
+    ML_AVAILABLE = False
+    print("⚠️ Bibliotecas ML não disponíveis. Funcionando em modo básico.")
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -34,6 +41,11 @@ class AdvancedLLMManager:
     
     def _init_embedding_model(self):
         """Inicializa modelo de embeddings"""
+        if not ML_AVAILABLE:
+            print("Modo básico: embeddings não disponíveis")
+            self.embedding_model = None
+            return
+            
         try:
             self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         except Exception as e:
@@ -42,6 +54,17 @@ class AdvancedLLMManager:
     
     def _load_vector_store(self):
         """Carrega índice vetorial existente"""
+        if not ML_AVAILABLE:
+            # Em modo básico, apenas carregar documentos se existirem
+            try:
+                if os.path.exists(self.documents_path):
+                    with open(self.documents_path, 'rb') as f:
+                        self.document_store = pickle.load(f)
+                    print(f"Documentos carregados: {len(self.document_store)} (modo básico)")
+            except Exception as e:
+                print(f"Erro ao carregar documentos: {e}")
+            return
+            
         try:
             if os.path.exists(self.index_path) and os.path.exists(self.documents_path):
                 self.vector_store = faiss.read_index(self.index_path)
@@ -54,6 +77,10 @@ class AdvancedLLMManager:
     
     def _create_new_index(self):
         """Cria novo índice vetorial"""
+        if not ML_AVAILABLE:
+            self.document_store = []
+            return
+            
         if self.embedding_model:
             # Dimensão do modelo all-MiniLM-L6-v2
             dimension = 384
@@ -62,7 +89,13 @@ class AdvancedLLMManager:
     
     def add_documents_to_index(self, documents: List[Dict]):
         """Adiciona documentos ao índice vetorial"""
-        if not self.embedding_model or not documents:
+        if not documents:
+            return
+            
+        # Em modo básico, apenas armazenar documentos sem embeddings
+        if not ML_AVAILABLE or not self.embedding_model:
+            self.document_store.extend(documents)
+            self._save_documents_only()
             return
         
         texts = []
@@ -88,6 +121,14 @@ class AdvancedLLMManager:
         # Salvar índice
         self._save_vector_store()
     
+    def _save_documents_only(self):
+        """Salva apenas documentos (modo básico)"""
+        try:
+            with open(self.documents_path, 'wb') as f:
+                pickle.dump(self.document_store, f)
+        except Exception as e:
+            print(f"Erro ao salvar documentos: {e}")
+    
     def _save_vector_store(self):
         """Salva índice vetorial"""
         try:
@@ -98,9 +139,13 @@ class AdvancedLLMManager:
             print(f"Erro ao salvar índice: {e}")
     
     def search_relevant_documents(self, query: str, top_k: int = 5) -> List[Dict]:
-        """Busca documentos relevantes usando similaridade vetorial"""
-        if not self.embedding_model or not self.vector_store:
+        """Busca documentos relevantes usando similaridade vetorial ou busca textual básica"""
+        if not self.document_store:
             return []
+        
+        # Se ML não disponível, fazer busca textual simples
+        if not ML_AVAILABLE or not self.embedding_model or not self.vector_store:
+            return self._simple_text_search(query, top_k)
         
         # Gerar embedding da consulta
         query_embedding = self.embedding_model.encode([query])
@@ -116,6 +161,28 @@ class AdvancedLLMManager:
                 relevant_docs.append(doc)
         
         return relevant_docs
+    
+    def _simple_text_search(self, query: str, top_k: int = 5) -> List[Dict]:
+        """Busca textual simples quando ML não está disponível"""
+        query_lower = query.lower()
+        relevant_docs = []
+        
+        for doc in self.document_store:
+            content = doc.get('content', '').lower()
+            # Calcular relevância baseada em palavras-chave
+            score = 0
+            for word in query_lower.split():
+                if word in content:
+                    score += content.count(word)
+            
+            if score > 0:
+                doc_copy = doc.copy()
+                doc_copy['relevance_score'] = score
+                relevant_docs.append(doc_copy)
+        
+        # Ordenar por relevância e retornar top_k
+        relevant_docs.sort(key=lambda x: x['relevance_score'], reverse=True)
+        return relevant_docs[:top_k]
     
     def create_knowledge_base_from_data(self, df: pd.DataFrame):
         """Cria base de conhecimento a partir dos dados"""
