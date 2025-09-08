@@ -583,60 +583,28 @@ Para usar o chat, você precisa:
 Sem a chave da OpenAI, não posso processar suas perguntas.
                     """
                 else:
-                    # Buscar documentos relevantes na base de conhecimento
-                    relevant_docs = st.session_state.llm_manager.search_relevant_documents(user_input, top_k=10)
+                    # Carregar dados processados mais recentes se disponíveis
+                    current_df = None
+                    dados_dir = Path("dados/processed")
                     
-                    # Preparar contexto com dados relevantes
-                    knowledge_context = ""
-                    if relevant_docs:
-                        knowledge_context = "\n\nDados relevantes encontrados:\n"
-                        for doc in relevant_docs:
-                            knowledge_context += f"- {doc['content']}\n"
-                    else:
-                        # Se não encontrou documentos relevantes, informar que há dados disponíveis
-                        knowledge_context = f"\n\nBase de conhecimento disponível com {len(st.session_state.llm_manager.document_store)} documentos de dados comerciais. Procure por informações específicas sobre clientes, volumes, datas, etc."
+                    if dados_dir.exists():
+                        # Buscar arquivo mais recente
+                        excel_files = list(dados_dir.glob("*.xlsx"))
+                        if excel_files:
+                            latest_file = max(excel_files, key=lambda x: x.stat().st_mtime)
+                            try:
+                                current_df = pd.read_excel(latest_file)
+                                print(f"Dados carregados: {len(current_df)} registros de {latest_file.name}")
+                            except Exception as e:
+                                print(f"Erro ao carregar dados: {e}")
                     
-                    # Preparar prompt especializado
-                    system_prompt = f"""Você é o GPTRACKER, assistente especializado em análise de dados logísticos e comerciais da Itracker.
-
-Você tem acesso a uma base de conhecimento com dados de importação/exportação incluindo:
-- Clientes (NOME EXPORTADOR, CONSIGNATÁRIO)
-- Quantidades (QTDE CONTEINER, TEUS, VOLUMES)
-- Datas (DATA EMBARQUE, ANO/MÊS)
-- Portos, navios, mercadorias, etc.
-
-INSTRUÇÕES IMPORTANTES:
-1. Para perguntas sobre rankings (ex: "maiores clientes"), faça análises baseadas nos dados disponíveis
-2. Para perguntas sobre volumes, use as colunas QTDE CONTEINER ou TEUS
-3. Seja específico com números e rankings quando possível
-4. Se não encontrar dados suficientes, explique que tipo de dados precisa
-
-Dados relevantes encontrados:{knowledge_context}
-
-Responda de forma analítica e específica, fornecendo números e insights quando disponível."""
-                    
-                    # Gerar resposta usando LLM com contexto dos dados
-                    messages = [
-                        {"role": "system", "content": system_prompt}
-                    ]
-                    
-                    # Adicionar histórico recente
-                    if st.session_state.messages:
-                        for msg in st.session_state.messages[-3:]:
-                            messages.append({"role": msg["role"], "content": msg["content"]})
-                    
-                    # Adicionar pergunta atual
-                    messages.append({"role": "user", "content": user_input})
-                    
-                    # Chamar OpenAI
-                    response_obj = st.session_state.llm_manager.openai_client.chat.completions.create(
-                        model="gpt-4",
-                        messages=messages,
-                        max_tokens=1000,
-                        temperature=0.3
+                    # Usar o método aprimorado de geração de resposta
+                    response = st.session_state.llm_manager.generate_response(
+                        query=user_input,
+                        context="",
+                        conversation_history=st.session_state.messages[-5:] if st.session_state.messages else None,
+                        df=current_df
                     )
-                    
-                    response = response_obj.choices[0].message.content
                 
                 # Adicionar resposta do assistente
                 st.session_state.messages.append({"role": "assistant", "content": response})

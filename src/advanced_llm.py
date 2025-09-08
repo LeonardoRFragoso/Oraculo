@@ -290,25 +290,83 @@ class AdvancedLLMManager:
         """Gera resposta usando RAG com GPT-4"""
         try:
             # Buscar documentos relevantes
-            relevant_docs = self.search_relevant_documents(query, top_k=3)
+            relevant_docs = self.search_relevant_documents(query, top_k=5)
             
-            # Construir contexto
+            # Construir contexto detalhado
             context_parts = []
             
-            # Adicionar dados relevantes
+            # Adicionar dados relevantes da base de conhecimento
             if relevant_docs:
-                context_parts.append("Informações relevantes da base de conhecimento:")
-                for doc in relevant_docs:
-                    context_parts.append(f"- {doc['content']}")
+                context_parts.append("=== DADOS DA BASE DE CONHECIMENTO ===")
+                for i, doc in enumerate(relevant_docs, 1):
+                    context_parts.append(f"{i}. {doc['content']}")
+                    if 'relevance_score' in doc:
+                        context_parts.append(f"   (Relevância: {doc['relevance_score']:.2f})")
             
-            # Adicionar estatísticas gerais
+            # Análise detalhada do DataFrame atual
             if not df.empty:
-                total_containers = df['qtd_container'].sum()
-                total_clientes = df['cliente'].nunique() if 'cliente' in df.columns else 0
+                context_parts.append("\n=== ANÁLISE DOS DADOS ATUAIS ===")
                 
-                context_parts.append(f"\nEstatísticas gerais:")
-                context_parts.append(f"- Total de containers: {total_containers:,}")
-                context_parts.append(f"- Número de clientes únicos: {total_clientes}")
+                # Informações básicas
+                context_parts.append(f"Total de registros: {len(df):,}")
+                context_parts.append(f"Colunas disponíveis: {', '.join(df.columns)}")
+                
+                # Detectar e analisar colunas automaticamente
+                numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                date_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['data', 'mes', 'ano', 'periodo'])]
+                client_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['cliente', 'consignatario', 'importador', 'exportador'])]
+                quantity_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['qtd', 'quantidade', 'container', 'teus', 'volumes'])]
+                
+                # Estatísticas por colunas de quantidade
+                if quantity_cols:
+                    for col in quantity_cols:
+                        try:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                            total = df[col].sum()
+                            media = df[col].mean()
+                            context_parts.append(f"\n{col.upper()}:")
+                            context_parts.append(f"  - Total: {total:,.0f}")
+                            context_parts.append(f"  - Média: {media:,.2f}")
+                            context_parts.append(f"  - Registros válidos: {df[col].notna().sum():,}")
+                        except:
+                            continue
+                
+                # Top clientes se disponível
+                if client_cols and quantity_cols:
+                    try:
+                        client_col = client_cols[0]
+                        qty_col = quantity_cols[0]
+                        top_clients = df.groupby(client_col)[qty_col].sum().sort_values(ascending=False).head(5)
+                        context_parts.append(f"\nTOP 5 CLIENTES por {qty_col}:")
+                        for i, (client, value) in enumerate(top_clients.items(), 1):
+                            context_parts.append(f"  {i}. {client}: {value:,.0f}")
+                    except:
+                        pass
+                
+                # Análise temporal se disponível
+                if date_cols and quantity_cols:
+                    try:
+                        date_col = date_cols[0]
+                        qty_col = quantity_cols[0]
+                        temporal_data = df.groupby(date_col)[qty_col].sum().sort_index()
+                        if len(temporal_data) > 1:
+                            context_parts.append(f"\nTENDÊNCIA TEMPORAL por {date_col}:")
+                            for period, value in temporal_data.tail(5).items():
+                                context_parts.append(f"  {period}: {value:,.0f}")
+                            
+                            # Calcular tendência
+                            if len(temporal_data) >= 2:
+                                last_value = temporal_data.iloc[-1]
+                                prev_value = temporal_data.iloc[-2]
+                                change = last_value - prev_value
+                                pct_change = (change / prev_value * 100) if prev_value != 0 else 0
+                                context_parts.append(f"  Variação último período: {change:+,.0f} ({pct_change:+.1f}%)")
+                    except:
+                        pass
+                
+                # Responder perguntas específicas baseadas na query
+                context_parts.append(f"\n=== ANÁLISE ESPECÍFICA PARA A PERGUNTA ===")
+                context_parts.append(self._analyze_specific_query(query, df))
             
             context = "\n".join(context_parts)
             
@@ -318,15 +376,19 @@ class AdvancedLLMManager:
             
             Suas responsabilidades:
             - Analisar dados de importação, exportação e cabotagem
-            - Fornecer insights comerciais e operacionais
-            - Identificar oportunidades de negócio
-            - Responder perguntas sobre performance e metas
+            - Fornecer insights comerciais e operacionais detalhados
+            - Identificar oportunidades de negócio com base em dados reais
+            - Responder perguntas sobre performance e metas com números precisos
             
-            Diretrizes de resposta:
-            - Seja preciso e use números específicos quando disponíveis
-            - Forneça insights acionáveis
-            - Mantenha tom profissional mas acessível
-            - Destaque tendências e padrões importantes
+            Diretrizes OBRIGATÓRIAS de resposta:
+            - SEMPRE use números específicos e dados reais fornecidos no contexto
+            - SEMPRE cite as fontes dos dados (ex: "Baseado nos dados analisados...")
+            - SEMPRE forneça análises quantitativas detalhadas
+            - SEMPRE inclua comparações, tendências e insights acionáveis
+            - NUNCA dê respostas genéricas sem dados específicos
+            - Se não houver dados suficientes, seja específico sobre o que está faltando
+            - Formate números com separadores de milhares (ex: 1.234 containers)
+            - Inclua percentuais e variações quando relevante
             """
             
             user_prompt = f"""
@@ -353,6 +415,111 @@ class AdvancedLLMManager:
             
         except Exception as e:
             return f"Erro ao gerar resposta: {str(e)}"
+    
+    def _analyze_specific_query(self, query: str, df: pd.DataFrame) -> str:
+        """Analisa a query específica e retorna insights direcionados"""
+        query_lower = query.lower()
+        insights = []
+        
+        try:
+            # Detectar colunas automaticamente
+            client_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['cliente', 'consignatario', 'importador', 'exportador'])]
+            quantity_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['qtd', 'quantidade', 'container', 'teus', 'volumes'])]
+            date_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['data', 'mes', 'ano', 'periodo'])]
+            port_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['porto', 'port', 'terminal'])]
+            armador_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['armador', 'shipping', 'carrier'])]
+            
+            # Análise por cliente específico
+            if any(word in query_lower for word in ['cliente', 'consignatario', 'accumed']) and client_cols:
+                client_col = client_cols[0]
+                if 'accumed' in query_lower:
+                    accumed_data = df[df[client_col].str.contains('ACCUMED', case=False, na=False)]
+                    if not accumed_data.empty and quantity_cols:
+                        qty_col = quantity_cols[0]
+                        total = accumed_data[qty_col].sum()
+                        insights.append(f"ACCUMED: {total:,.0f} {qty_col} encontrados nos dados")
+                        
+                        if date_cols:
+                            date_col = date_cols[0]
+                            by_period = accumed_data.groupby(date_col)[qty_col].sum()
+                            insights.append(f"Distribuição por período: {dict(by_period)}")
+            
+            # Análise temporal específica
+            if any(word in query_lower for word in ['março', 'march', '2025', '2024']) and date_cols and quantity_cols:
+                date_col = date_cols[0]
+                qty_col = quantity_cols[0]
+                
+                if 'março' in query_lower or 'march' in query_lower:
+                    march_data = df[df[date_col].astype(str).str.contains('03|março|march', case=False, na=False)]
+                    if not march_data.empty:
+                        total = march_data[qty_col].sum()
+                        insights.append(f"Março: {total:,.0f} {qty_col}")
+                
+                if '2025' in query_lower:
+                    data_2025 = df[df[date_col].astype(str).str.contains('2025', na=False)]
+                    if not data_2025.empty:
+                        total = data_2025[qty_col].sum()
+                        insights.append(f"2025: {total:,.0f} {qty_col}")
+                
+                if '2024' in query_lower:
+                    data_2024 = df[df[date_col].astype(str).str.contains('2024', na=False)]
+                    if not data_2024.empty:
+                        total = data_2024[qty_col].sum()
+                        insights.append(f"2024: {total:,.0f} {qty_col}")
+            
+            # Análise por porto
+            if any(word in query_lower for word in ['porto', 'santos', 'port']) and port_cols and quantity_cols:
+                port_col = port_cols[0]
+                qty_col = quantity_cols[0]
+                
+                if 'santos' in query_lower:
+                    santos_data = df[df[port_col].str.contains('SANTOS', case=False, na=False)]
+                    if not santos_data.empty:
+                        total = santos_data[qty_col].sum()
+                        insights.append(f"Porto de Santos: {total:,.0f} {qty_col}")
+                        
+                        if armador_cols:
+                            armador_col = armador_cols[0]
+                            top_armadores = santos_data.groupby(armador_col)[qty_col].sum().sort_values(ascending=False).head(5)
+                            insights.append(f"Top armadores Santos: {dict(top_armadores)}")
+            
+            # Análise comparativa
+            if any(word in query_lower for word in ['compare', 'comparar', 'janeiro', 'fevereiro']) and date_cols and quantity_cols:
+                date_col = date_cols[0]
+                qty_col = quantity_cols[0]
+                
+                jan_data = df[df[date_col].astype(str).str.contains('01|janeiro|january', case=False, na=False)]
+                feb_data = df[df[date_col].astype(str).str.contains('02|fevereiro|february', case=False, na=False)]
+                
+                if not jan_data.empty and not feb_data.empty:
+                    jan_total = jan_data[qty_col].sum()
+                    feb_total = feb_data[qty_col].sum()
+                    diff = feb_total - jan_total
+                    pct_change = (diff / jan_total * 100) if jan_total != 0 else 0
+                    
+                    insights.append(f"Janeiro: {jan_total:,.0f} {qty_col}")
+                    insights.append(f"Fevereiro: {feb_total:,.0f} {qty_col}")
+                    insights.append(f"Variação: {diff:+,.0f} ({pct_change:+.1f}%)")
+            
+            # Análise de tendência
+            if any(word in query_lower for word in ['tendencia', 'trend', 'ultimos', 'meses']) and date_cols and quantity_cols:
+                date_col = date_cols[0]
+                qty_col = quantity_cols[0]
+                
+                monthly_data = df.groupby(date_col)[qty_col].sum().sort_index().tail(3)
+                if len(monthly_data) >= 2:
+                    insights.append(f"Últimos 3 meses: {dict(monthly_data)}")
+                    
+                    # Calcular tendência
+                    values = monthly_data.values
+                    if len(values) >= 2:
+                        trend = values[-1] - values[0]
+                        insights.append(f"Tendência geral: {trend:+,.0f} {qty_col}")
+            
+            return "\n".join(insights) if insights else "Análise específica não disponível para esta consulta"
+            
+        except Exception as e:
+            return f"Erro na análise específica: {str(e)}"
     
     def generate_proactive_insights(self, df: pd.DataFrame) -> List[str]:
         """Gera insights proativos baseados nos dados"""
@@ -392,14 +559,23 @@ class AdvancedLLMManager:
         
         return insights
     
-    def generate_response(self, query: str, context: str = "", conversation_history: List[Dict] = None) -> str:
-        """Método principal para gerar respostas do chat"""
+    def generate_response(self, query: str, context: str = "", conversation_history: List[Dict] = None, df: pd.DataFrame = None) -> str:
+        """Método principal para gerar respostas do chat com dados integrados"""
         try:
-            # Preparar mensagens para o chat
+            # Se temos dados, usar o método enhanced que inclui análise detalhada
+            if df is not None and not df.empty:
+                return self.generate_enhanced_response(query, df)
+            
+            # Fallback para método básico quando não há dados
             messages = [
                 {
                     "role": "system",
                     "content": """Você é o GPTRACKER, um assistente especializado em análise de dados logísticos e comerciais da empresa Itracker.
+
+IMPORTANTE: Atualmente não há dados carregados no sistema. Para fornecer análises precisas, é necessário:
+1. Carregar planilhas de dados via upload ou links da nuvem
+2. Aguardar o processamento dos dados
+3. Refazer a pergunta para obter análise baseada em dados reais
 
 Suas especialidades incluem:
 - Análise de dados de importação, exportação e cabotagem
@@ -407,7 +583,7 @@ Suas especialidades incluem:
 - Análise de budget e metas
 - Tendências do mercado logístico
 
-Responda de forma clara, objetiva e profissional. Use dados quando disponível e forneça insights acionáveis."""
+Quando não há dados disponíveis, explique claramente essa limitação e oriente sobre como carregar dados."""
                 }
             ]
             
