@@ -583,28 +583,67 @@ Para usar o chat, você precisa:
 Sem a chave da OpenAI, não posso processar suas perguntas.
                     """
                 else:
-                    # Carregar dados processados mais recentes se disponíveis
-                    current_df = None
+                    # Carregar TODOS os dados processados e consolidar
+                    combined_df = None
                     dados_dir = Path("dados/processed")
                     
                     if dados_dir.exists():
-                        # Buscar arquivo mais recente
                         excel_files = list(dados_dir.glob("*.xlsx"))
                         if excel_files:
-                            latest_file = max(excel_files, key=lambda x: x.stat().st_mtime)
-                            try:
-                                current_df = pd.read_excel(latest_file)
-                                print(f"Dados carregados: {len(current_df)} registros de {latest_file.name}")
-                            except Exception as e:
-                                print(f"Erro ao carregar dados: {e}")
+                            dataframes = []
+                            file_info = []
+                            
+                            for file_path in excel_files:
+                                try:
+                                    df_temp = pd.read_excel(file_path)
+                                    if not df_temp.empty:
+                                        # Adicionar coluna de origem
+                                        df_temp['arquivo_origem'] = file_path.name
+                                        dataframes.append(df_temp)
+                                        file_info.append(f"{file_path.name}: {len(df_temp):,} registros")
+                                except Exception as e:
+                                    st.error(f"Erro ao carregar {file_path.name}: {e}")
+                            
+                            if dataframes:
+                                # Consolidar todos os DataFrames
+                                combined_df = pd.concat(dataframes, ignore_index=True, sort=False)
+                                
+                                # Mostrar informações consolidadas
+                                with st.expander("📊 Dados Consolidados", expanded=False):
+                                    st.write(f"**Total de arquivos:** {len(dataframes)}")
+                                    st.write(f"**Total de registros:** {len(combined_df):,}")
+                                    st.write("**Arquivos processados:**")
+                                    for info in file_info:
+                                        st.write(f"  - {info}")
+                                    
+                                    # Verificar dados ACCUMED se pergunta for sobre ela
+                                    if 'accumed' in user_input.lower():
+                                        accumed_cols = [col for col in combined_df.columns if any(keyword in col.lower() for keyword in ['cliente', 'consignatario', 'importador', 'exportador'])]
+                                        if accumed_cols:
+                                            accumed_data = combined_df[combined_df[accumed_cols[0]].str.contains('ACCUMED', case=False, na=False)]
+                                            st.write(f"**Registros ACCUMED encontrados:** {len(accumed_data)}")
+                                            if len(accumed_data) > 0:
+                                                # Mostrar distribuição por arquivo
+                                                accumed_by_file = accumed_data['arquivo_origem'].value_counts()
+                                                st.write("**Distribuição ACCUMED por arquivo:**")
+                                                for arquivo, count in accumed_by_file.items():
+                                                    st.write(f"  - {arquivo}: {count} registros")
                     
-                    # Usar o método aprimorado de geração de resposta
-                    response = st.session_state.llm_manager.generate_response(
-                        query=user_input,
-                        context="",
-                        conversation_history=st.session_state.messages[-5:] if st.session_state.messages else None,
-                        df=current_df
-                    )
+                    # Usar o método aprimorado com dados consolidados
+                    if combined_df is not None and not combined_df.empty:
+                        response = st.session_state.llm_manager.generate_enhanced_response(
+                            query=user_input,
+                            df=combined_df,
+                            max_tokens=1000
+                        )
+                    else:
+                        # Fallback: usar base de conhecimento existente
+                        response = st.session_state.llm_manager.generate_response(
+                            query=user_input,
+                            context="",
+                            conversation_history=st.session_state.messages[-5:] if st.session_state.messages else None,
+                            df=None
+                        )
                 
                 # Adicionar resposta do assistente
                 st.session_state.messages.append({"role": "assistant", "content": response})
