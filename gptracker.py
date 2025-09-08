@@ -618,10 +618,30 @@ Sem a chave da OpenAI, não posso processar suas perguntas.
                                     
                                     st.write(f"**📋 Colunas disponíveis:** {', '.join(combined_df.columns[:10])}{'...' if len(combined_df.columns) > 10 else ''}")
                                     
-                                    # Verificar dados ACCUMED sempre
-                                    accumed_cols = [col for col in combined_df.columns if any(keyword in col.lower() for keyword in ['cliente', 'consignatario', 'importador', 'exportador'])]
+                                    # Verificar dados ACCUMED sempre (detecção robusta/acento-insensível)
+                                    def _norm(s):
+                                        try:
+                                            s = str(s).lower()
+                                        except Exception:
+                                            return ""
+                                        table = str.maketrans(
+                                            "áàãâäéêëèíïîìóõôöòúüûùç",
+                                            "aaaaaeeeeiiiiooooouuuuc"
+                                        )
+                                        return s.translate(table)
+                                    
+                                    candidate_keys = ['cliente', 'consignatario', 'consignatário', 'importador', 'exportador']
+                                    accumed_cols = [col for col in combined_df.columns if any(k in _norm(col) for k in candidate_keys)]
+                                    
                                     if accumed_cols:
-                                        accumed_data = combined_df[combined_df[accumed_cols[0]].str.contains('ACCUMED', case=False, na=False)]
+                                        col_cli = accumed_cols[0]
+                                        try:
+                                            series_cli = combined_df[col_cli].astype(str)
+                                            accumed_mask = series_cli.str.contains('ACCUMED', case=False, na=False)
+                                            accumed_data = combined_df[accumed_mask]
+                                        except Exception:
+                                            accumed_data = combined_df.iloc[0:0]
+                                        
                                         if len(accumed_data) > 0:
                                             st.write(f"🎯 **Registros ACCUMED encontrados:** {len(accumed_data)}")
                                             # Mostrar distribuição por arquivo
@@ -631,11 +651,13 @@ Sem a chave da OpenAI, não posso processar suas perguntas.
                                                 st.write(f"  • {arquivo}: {count} registros")
                                             
                                             # Mostrar anos disponíveis
-                                            if any('ano' in col.lower() or 'data' in col.lower() for col in accumed_data.columns):
-                                                anos_cols = [col for col in accumed_data.columns if 'ano' in col.lower() or 'data' in col.lower()]
-                                                if anos_cols:
+                                            anos_cols = [col for col in combined_df.columns if any(k in _norm(col) for k in ['ano', 'data'])]
+                                            if anos_cols:
+                                                try:
                                                     anos_unicos = accumed_data[anos_cols[0]].astype(str).str[:4].unique()
-                                                    st.write(f"**📅 Anos com dados ACCUMED:** {', '.join(sorted(anos_unicos))}")
+                                                    st.write(f"**📅 Anos com dados ACCUMED:** {', '.join(sorted(map(str, anos_unicos)))}")
+                                                except Exception:
+                                                    pass
                                         else:
                                             st.warning("⚠️ Nenhum registro ACCUMED encontrado nos dados consolidados")
                                     else:

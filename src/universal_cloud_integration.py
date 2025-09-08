@@ -197,25 +197,28 @@ class UniversalCloudIntegrator:
         last_error = None
         for attempt_url in fallback_urls:
             try:
-                self.logger.info(f"Tentando URL: {attempt_url}")
+                self.logger.debug(f"Tentando URL: {attempt_url}")
                 response = requests.get(attempt_url, headers=headers, timeout=30)
                 response.raise_for_status()
                 
                 # Verificar se o conteúdo não é uma página de erro HTML
                 content = response.content
                 if b'<!DOCTYPE html>' not in content and b'<html' not in content:
-                    self.logger.info(f"Sucesso com URL: {attempt_url}")
+                    self.logger.debug(f"Sucesso com URL: {attempt_url}")
                     return content
                 else:
-                    self.logger.warning(f"URL retornou HTML (página de erro): {attempt_url}")
+                    self.logger.debug(f"URL retornou HTML (página de erro): {attempt_url}")
                     
             except requests.exceptions.RequestException as e:
                 last_error = e
-                self.logger.warning(f"Falha na URL {attempt_url}: {str(e)}")
+                self.logger.debug(f"Falha na URL {attempt_url}: {str(e)}")
                 continue
         
         # Se todas as tentativas falharam, lançar o último erro
         if last_error:
+            self.logger.warning(
+                f"Todas as tentativas de download do Google Sheets falharam (sheet_id={sheet_id}, gid={gid}): {last_error}"
+            )
             raise last_error
         
         return None
@@ -227,7 +230,7 @@ class UniversalCloudIntegrator:
         try:
             # Detectar provedor
             provider = self.detect_cloud_provider(url)
-            self.logger.info(f"Provedor detectado: {provider}")
+            self.logger.debug(f"Provedor detectado: {provider}")
             
             # Tentar Google Sheets API primeiro se disponível
             if provider == 'google_sheets' and GOOGLE_AVAILABLE and self.gc:

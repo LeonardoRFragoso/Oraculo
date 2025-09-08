@@ -156,6 +156,18 @@ class AutoSyncManager:
                 # Atualizar base de conhecimento
                 self.llm_manager.update_knowledge_base(df)
                 
+                # Persistir dados atualizados para o consolidado do chat
+                try:
+                    dados_dir = Path("dados/processed")
+                    dados_dir.mkdir(parents=True, exist_ok=True)
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    safe_name = "".join(c for c in source_name if c.isalnum() or c in ("_", "-", ".", " ")).strip().replace(" ", "_")
+                    filename = f"autosync_{safe_name}_{ts}.xlsx"
+                    filepath = dados_dir / filename
+                    df.to_excel(filepath, index=False)
+                except Exception as e:
+                    self.logger.error(f"Erro ao salvar atualização em dados/processed: {e}")
+                
                 self.logger.info(f"Base atualizada: {source_name} - {update['new_count']} registros")
             
             return True

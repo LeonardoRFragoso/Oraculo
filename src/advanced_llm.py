@@ -11,6 +11,10 @@ import openai
 import pickle
 from pathlib import Path
 from dotenv import load_dotenv
+import logging
+
+# Configurar logger do módulo
+logger = logging.getLogger(__name__)
 
 # Importações condicionais para ML
 try:
@@ -19,10 +23,11 @@ try:
     ML_AVAILABLE = True
 except ImportError:
     ML_AVAILABLE = False
-    print("⚠️ Bibliotecas ML não disponíveis. Funcionando em modo básico.")
+    logging.getLogger(__name__).debug("Bibliotecas ML não disponíveis. Funcionando em modo básico.")
 
 # Carregar variáveis de ambiente
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 class AdvancedLLMManager:
     def __init__(self):
@@ -42,14 +47,14 @@ class AdvancedLLMManager:
     def _init_embedding_model(self):
         """Inicializa modelo de embeddings"""
         if not ML_AVAILABLE:
-            print("Modo básico: embeddings não disponíveis")
+            logger.debug("Modo básico: embeddings não disponíveis")
             self.embedding_model = None
             return
             
         try:
             self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         except Exception as e:
-            print(f"Erro ao carregar modelo de embeddings: {e}")
+            logger.warning(f"Erro ao carregar modelo de embeddings: {e}")
             self.embedding_model = None
     
     def _load_vector_store(self):
@@ -60,9 +65,9 @@ class AdvancedLLMManager:
                 if os.path.exists(self.documents_path):
                     with open(self.documents_path, 'rb') as f:
                         self.document_store = pickle.load(f)
-                    print(f"Documentos carregados: {len(self.document_store)} (modo básico)")
+                    logger.debug(f"Documentos carregados: {len(self.document_store)} (modo básico)")
             except Exception as e:
-                print(f"Erro ao carregar documentos: {e}")
+                logger.warning(f"Erro ao carregar documentos: {e}")
             return
             
         try:
@@ -70,9 +75,9 @@ class AdvancedLLMManager:
                 self.vector_store = faiss.read_index(self.index_path)
                 with open(self.documents_path, 'rb') as f:
                     self.document_store = pickle.load(f)
-                print(f"Índice carregado: {len(self.document_store)} documentos")
+                logger.debug(f"Índice carregado: {len(self.document_store)} documentos")
         except Exception as e:
-            print(f"Erro ao carregar índice: {e}")
+            logger.warning(f"Erro ao carregar índice: {e}")
             self._create_new_index()
     
     def _create_new_index(self):
@@ -127,7 +132,7 @@ class AdvancedLLMManager:
             with open(self.documents_path, 'wb') as f:
                 pickle.dump(self.document_store, f)
         except Exception as e:
-            print(f"Erro ao salvar documentos: {e}")
+            logger.error(f"Erro ao salvar documentos: {e}")
     
     def _save_vector_store(self):
         """Salva índice vetorial"""
@@ -136,7 +141,7 @@ class AdvancedLLMManager:
             with open(self.documents_path, 'wb') as f:
                 pickle.dump(self.document_store, f)
         except Exception as e:
-            print(f"Erro ao salvar índice: {e}")
+            logger.error(f"Erro ao salvar índice: {e}")
     
     def search_relevant_documents(self, query: str, top_k: int = 5) -> List[Dict]:
         """Busca documentos relevantes usando similaridade vetorial ou busca textual básica"""
@@ -187,11 +192,11 @@ class AdvancedLLMManager:
     def create_knowledge_base_from_data(self, df: pd.DataFrame):
         """Cria base de conhecimento a partir dos dados"""
         if df.empty:
-            print("DataFrame vazio - não criando base de conhecimento")
+            logger.debug("DataFrame vazio - não criando base de conhecimento")
             return
         
-        print(f"Criando base de conhecimento com {len(df)} registros")
-        print(f"Colunas disponíveis: {list(df.columns)}")
+        logger.debug(f"Criando base de conhecimento com {len(df)} registros")
+        logger.debug(f"Colunas disponíveis: {list(df.columns)}")
         
         documents = []
         
@@ -200,7 +205,7 @@ class AdvancedLLMManager:
         quantidade_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['qtd', 'quantidade', 'container', 'teus', 'volumes'])]
         data_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['data', 'mes', 'ano', 'periodo'])]
         
-        print(f"Colunas detectadas - Cliente: {cliente_cols}, Quantidade: {quantidade_cols}, Data: {data_cols}")
+        logger.debug(f"Colunas detectadas - Cliente: {cliente_cols}, Quantidade: {quantidade_cols}, Data: {data_cols}")
         
         # Usar primeira coluna encontrada de cada tipo
         cliente_col = cliente_cols[0] if cliente_cols else None
@@ -252,7 +257,7 @@ class AdvancedLLMManager:
                         }
                     })
             except Exception as e:
-                print(f"Erro ao criar resumos por cliente: {e}")
+                logger.warning(f"Erro ao criar resumos por cliente: {e}")
         
         # Criar resumos por período se detectado
         if data_col and quantidade_col:
@@ -276,15 +281,15 @@ class AdvancedLLMManager:
                         }
                     })
             except Exception as e:
-                print(f"Erro ao criar resumos por período: {e}")
+                logger.warning(f"Erro ao criar resumos por período: {e}")
         
-        print(f"Total de documentos criados: {len(documents)}")
+        logger.debug(f"Total de documentos criados: {len(documents)}")
         
         # Adicionar documentos ao índice
         if documents:
             self.add_documents_to_index(documents)
         else:
-            print("Nenhum documento foi criado!")
+            logger.debug("Nenhum documento foi criado!")
     
     def generate_enhanced_response(self, query: str, df: pd.DataFrame, max_tokens: int = 1000) -> str:
         """Gera resposta usando RAG com GPT-4"""
@@ -292,20 +297,12 @@ class AdvancedLLMManager:
             # Buscar documentos relevantes
             relevant_docs = self.search_relevant_documents(query, top_k=5)
             
-            # Construir contexto detalhado
+            # Construir contexto detalhado (priorizando o DataFrame consolidado)
             context_parts = []
             
-            # Adicionar dados relevantes da base de conhecimento
-            if relevant_docs:
-                context_parts.append("=== DADOS DA BASE DE CONHECIMENTO ===")
-                for i, doc in enumerate(relevant_docs, 1):
-                    context_parts.append(f"{i}. {doc['content']}")
-                    if 'relevance_score' in doc:
-                        context_parts.append(f"   (Relevância: {doc['relevance_score']:.2f})")
-            
-            # Análise detalhada do DataFrame atual
+            # Análise detalhada do DataFrame atual (fonte canônica)
             if not df.empty:
-                context_parts.append("\n=== ANÁLISE DETALHADA DOS DADOS ===")
+                context_parts.append("\n=== ANÁLISE DETALHADA DOS DADOS (FONTE CANÔNICA) ===")
                 
                 # Informações básicas
                 context_parts.append(f"Total de registros: {len(df):,}")
@@ -326,7 +323,7 @@ class AdvancedLLMManager:
                 
                 # Detectar colunas por categoria
                 numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-                date_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['data', 'mes', 'ano', 'periodo'])]
+                date_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['data', 'mes', 'mês', 'ano', 'periodo', 'ano/mes', 'ano_mes'])]
                 client_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['cliente', 'consignatario', 'importador', 'exportador'])]
                 quantity_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['qtd', 'quantidade', 'container', 'teus', 'volumes'])]
                 
@@ -412,6 +409,14 @@ class AdvancedLLMManager:
                 context_parts.append(f"\n=== ANÁLISE ESPECÍFICA PARA A PERGUNTA ===")
                 context_parts.append(self._analyze_specific_query(query, df))
             
+            # Adicionar dados da base de conhecimento como complemento
+            if relevant_docs:
+                context_parts.append("\n=== DADOS DA BASE DE CONHECIMENTO (COMPLEMENTAR) ===")
+                for i, doc in enumerate(relevant_docs, 1):
+                    context_parts.append(f"{i}. {doc['content']}")
+                    if 'relevance_score' in doc:
+                        context_parts.append(f"   (Relevância: {doc['relevance_score']:.2f})")
+
             context = "\n".join(context_parts)
             
             # Criar prompt aprimorado
@@ -425,18 +430,19 @@ class AdvancedLLMManager:
             - Responder perguntas sobre performance e metas com números precisos
             
             Diretrizes OBRIGATÓRIAS de resposta:
-            - SEMPRE analise a estrutura detalhada dos dados fornecida no contexto
-            - SEMPRE use os tipos de dados e exemplos de valores para entender o formato correto
-            - SEMPRE procure por dados em TODAS as colunas relevantes, não apenas nas óbvias
-            - Se uma consulta retorna 0 resultados, EXPLIQUE especificamente quais colunas foram verificadas e por que não encontrou dados
+            - PRIORIZE o DataFrame consolidado fornecido no contexto como FONTE CANÔNICA de verdade.
+            - Use a base de conhecimento apenas como material COMPLEMENTAR; se houver conflito, CONFIE no DataFrame e explique a divergência.
+            - SEMPRE analise a estrutura detalhada dos dados fornecida no contexto.
+            - SEMPRE use os tipos de dados e exemplos de valores para entender o formato correto.
+            - SEMPRE procure por dados em TODAS as colunas relevantes, não apenas nas óbvias.
+            - Se a consulta exigir filtros (cliente/consignatário, I/E, porto, mês/ano) e o DataFrame NÃO tiver as colunas correspondentes, declare explicitamente quais colunas faltam e NÃO infira números.
+            - Se após os filtros o DataFrame retornar 0 registros, responda 0 (zero) e explique os filtros aplicados.
+            - NUNCA extrapole números com base em exemplos, documentos ou conhecimento prévio quando o DataFrame não confirma.
             - SEMPRE cite as colunas específicas usadas na análise (ex: "Baseado na coluna 'DATA_EMBARQUE'...")
-            - SEMPRE forneça análises quantitativas detalhadas quando há dados
-            - SEMPRE inclua comparações, tendências e insights acionáveis
-            - NUNCA dê respostas genéricas sem dados específicos
-            - Se não houver dados suficientes, seja específico sobre quais colunas e formatos foram verificados
-            - Formate números com separadores de milhares (ex: 1.234 containers)
-            - Inclua percentuais e variações quando relevante
-            - Use a análise detalhada de colunas para identificar o formato correto de datas e valores
+            - SEMPRE forneça análises quantitativas detalhadas quando há dados.
+            - SEMPRE inclua comparações, tendências e insights acionáveis.
+            - Se não houver dados suficientes, seja específico sobre quais colunas e formatos foram verificados.
+            - Formate números com separadores de milhares (ex: 1.234 containers) e inclua percentuais e variações quando relevante.
             """
             
             user_prompt = f"""
@@ -470,102 +476,184 @@ class AdvancedLLMManager:
         insights = []
         
         try:
-            # Detectar colunas automaticamente
-            client_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['cliente', 'consignatario', 'importador', 'exportador'])]
-            quantity_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['qtd', 'quantidade', 'container', 'teus', 'volumes'])]
-            date_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['data', 'mes', 'ano', 'periodo'])]
-            port_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['porto', 'port', 'terminal'])]
-            armador_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['armador', 'shipping', 'carrier'])]
+            # Função utilitária para normalizar acentos
+            def _norm(s):
+                try:
+                    s = str(s).lower()
+                except Exception:
+                    return ""
+                table = str.maketrans(
+                    "áàãâäéêëèíïîìóõôöòúüûùç",
+                    "aaaaaeeeeiiiiooooouuuuc"
+                )
+                return s.translate(table)
             
-            # Análise por cliente específico
-            if any(word in query_lower for word in ['cliente', 'consignatario', 'accumed']) and client_cols:
-                client_col = client_cols[0]
+            # Mapear colunas originais -> normalizadas
+            norm_cols = {col: _norm(col) for col in df.columns}
+            
+            # Detectar colunas automaticamente (com normalização)
+            client_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['cliente', 'consignat', 'importador', 'exportador'])]
+            quantity_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['qtd', 'qtde', 'container', 'teus', 'volumes'])]
+            # Priorizar colunas com nomes mais específicos
+            quantity_cols = sorted(quantity_cols, key=lambda c: (0 if 'qtd' in _norm(c) or 'qtde' in _norm(c) else 1))
+            
+            date_cols = []
+            for col, ncol in norm_cols.items():
+                if any(k in ncol for k in ['data', 'mes', 'mês', 'ano', 'periodo', 'ano/mes', 'ano_mes']):
+                    date_cols.append(col)
+            
+            port_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['porto', 'port', 'terminal', 'por/uf', 'origem', 'embarque', 'destino'])]
+            armador_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['armador', 'shipping', 'carrier'])]
+            ie_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['i/e', 'ie', 'importa', 'exporta', 'operacao', 'operac'])]
+            
+            # Helpers de filtro
+            def filter_year(df_local, year):
+                for col in date_cols:
+                    try:
+                        # Tenta por texto
+                        mask = df_local[col].astype(str).str.contains(str(year), case=False, na=False)
+                        if mask.any():
+                            return df_local[mask]
+                    except Exception:
+                        continue
+                return df_local.iloc[0:0]
+            
+            def filter_month_year(df_local, month, year):
+                # tenta formatos usuais: 03/2025, 2025-03, 202503
+                patterns = [f"{month:02d}/{year}", f"{year}-{month:02d}", f"{year}{month:02d}", f"{month:02d}-{year}"]
+                for col in date_cols:
+                    col_str = df_local[col].astype(str)
+                    mask_any = False
+                    mask = None
+                    for p in patterns:
+                        m = col_str.str.contains(p, case=False, na=False)
+                        mask = m if mask is None else (mask | m)
+                        mask_any = mask_any or m.any()
+                    if mask_any:
+                        return df_local[mask]
+                return df_local.iloc[0:0]
+            
+            def filter_ie(df_local, tipo):
+                if not ie_cols:
+                    return df_local
+                tipo = _norm(tipo)
+                for col in ie_cols:
+                    ncol = _norm(col)
+                    s = df_local[col].astype(str).apply(_norm)
+                    if 'i/e' in ncol or 'ie' in ncol:
+                        if 'i' in tipo:
+                            m = s.str.contains('^i$', na=False) | s.str.contains('import', na=False)
+                        else:
+                            m = s.str.contains('^e$', na=False) | s.str.contains('export', na=False)
+                        return df_local[m]
+                    else:
+                        if 'import' in tipo:
+                            m = s.str.contains('import', na=False)
+                        else:
+                            m = s.str.contains('export', na=False)
+                        return df_local[m]
+                return df_local
+            
+            def filter_port_santos(df_local):
+                if not port_cols:
+                    return df_local.iloc[0:0]
+                mask = None
+                for col in port_cols:
+                    try:
+                        s = df_local[col].astype(str)
+                        m = s.str.contains('SANTOS', case=False, na=False)
+                        mask = m if mask is None else (mask | m)
+                    except Exception:
+                        continue
+                return df_local[mask] if mask is not None else df_local.iloc[0:0]
+            
+            # Preparos básicos
+            qty_col = quantity_cols[0] if quantity_cols else None
+            date_col = date_cols[0] if date_cols else None
+            client_col = client_cols[0] if client_cols else None
+            armador_col = armador_cols[0] if armador_cols else None
+            
+            # 1) Cliente específico (ex.: ACCUMED 2024)
+            if any(word in query_lower for word in ['cliente', 'consignatario', 'accumed']) and client_col and qty_col:
+                df_client = df
                 if 'accumed' in query_lower:
-                    accumed_data = df[df[client_col].str.contains('ACCUMED', case=False, na=False)]
-                    if not accumed_data.empty and quantity_cols:
-                        qty_col = quantity_cols[0]
-                        total = accumed_data[qty_col].sum()
-                        insights.append(f"ACCUMED: {total:,.0f} {qty_col} encontrados nos dados")
-                        
-                        if date_cols:
-                            date_col = date_cols[0]
-                            by_period = accumed_data.groupby(date_col)[qty_col].sum()
-                            insights.append(f"Distribuição por período: {dict(by_period)}")
+                    df_client = df_client[df_client[client_col].astype(str).str.contains('ACCUMED', case=False, na=False)]
+                # Filtrar por ano presente na query
+                for year in ['2024', '2025']:
+                    if year in query_lower and date_cols:
+                        df_client = filter_year(df_client, int(year))
+                        break
+                total = pd.to_numeric(df_client[qty_col], errors='coerce').sum()
+                insights.append(f"Cliente '{client_col}': {total:,.0f} {qty_col}")
+                if date_cols and not df_client.empty:
+                    by_period = df_client.groupby(date_col)[qty_col].sum().sort_index()
+                    insights.append(f"Distribuição por {date_col}: {dict(by_period.tail(6))}")
             
-            # Análise temporal específica
-            if any(word in query_lower for word in ['março', 'march', '2025', '2024']) and date_cols and quantity_cols:
-                date_col = date_cols[0]
-                qty_col = quantity_cols[0]
-                
-                if 'março' in query_lower or 'march' in query_lower:
-                    march_data = df[df[date_col].astype(str).str.contains('03|março|march', case=False, na=False)]
-                    if not march_data.empty:
-                        total = march_data[qty_col].sum()
-                        insights.append(f"Março: {total:,.0f} {qty_col}")
-                
-                if '2025' in query_lower:
-                    data_2025 = df[df[date_col].astype(str).str.contains('2025', na=False)]
-                    if not data_2025.empty:
-                        total = data_2025[qty_col].sum()
-                        insights.append(f"2025: {total:,.0f} {qty_col}")
-                
-                if '2024' in query_lower:
-                    data_2024 = df[df[date_col].astype(str).str.contains('2024', na=False)]
-                    if not data_2024.empty:
-                        total = data_2024[qty_col].sum()
-                        insights.append(f"2024: {total:,.0f} {qty_col}")
+            # 2) Temporal específico (Março 2025, 2024 vs 2025)
+            if any(word in query_lower for word in ['março', 'marco', 'march', '2025', '2024']) and qty_col:
+                # Março de 2025
+                if any(w in query_lower for w in ['março', 'marco', 'march']):
+                    df_march = filter_month_year(df, 3, 2025) if date_cols else df.iloc[0:0]
+                    total = pd.to_numeric(df_march[qty_col], errors='coerce').sum()
+                    insights.append(f"Março/2025: {total:,.0f} {qty_col}")
+                # Totais por ano
+                if '2025' in query_lower and date_cols:
+                    df_2025 = filter_year(df, 2025)
+                    total_2025 = pd.to_numeric(df_2025[qty_col], errors='coerce').sum()
+                    insights.append(f"2025: {total_2025:,.0f} {qty_col}")
+                if '2024' in query_lower and date_cols:
+                    df_2024 = filter_year(df, 2024)
+                    total_2024 = pd.to_numeric(df_2024[qty_col], errors='coerce').sum()
+                    insights.append(f"2024: {total_2024:,.0f} {qty_col}")
             
-            # Análise por porto
-            if any(word in query_lower for word in ['porto', 'santos', 'port']) and port_cols and quantity_cols:
-                port_col = port_cols[0]
-                qty_col = quantity_cols[0]
-                
-                if 'santos' in query_lower:
-                    santos_data = df[df[port_col].str.contains('SANTOS', case=False, na=False)]
-                    if not santos_data.empty:
-                        total = santos_data[qty_col].sum()
-                        insights.append(f"Porto de Santos: {total:,.0f} {qty_col}")
-                        
-                        if armador_cols:
-                            armador_col = armador_cols[0]
-                            top_armadores = santos_data.groupby(armador_col)[qty_col].sum().sort_values(ascending=False).head(5)
-                            insights.append(f"Top armadores Santos: {dict(top_armadores)}")
+            # 3) Porto de Santos e ranking de armadores
+            if any(word in query_lower for word in ['porto', 'santos', 'port']) and qty_col:
+                df_santos = filter_port_santos(df)
+                if not df_santos.empty:
+                    total_santos = pd.to_numeric(df_santos[qty_col], errors='coerce').sum()
+                    insights.append(f"Porto de Santos (todas as datas): {total_santos:,.0f} {qty_col}")
+                    # Filtrar por ano da query (ex.: 2024)
+                    if '2024' in query_lower and date_cols:
+                        df_santos = filter_year(df_santos, 2024)
+                    if '2025' in query_lower and date_cols:
+                        df_santos = filter_year(df_santos, 2025)
+                    if armador_col and not df_santos.empty:
+                        top_arm = df_santos.groupby(armador_col)[qty_col].sum().sort_values(ascending=False).head(5)
+                        insights.append(f"Top armadores em Santos: {dict(top_arm)}")
+                else:
+                    insights.append("Não encontrei registros do Porto de Santos nas colunas de porto detectadas.")
             
-            # Análise comparativa
-            if any(word in query_lower for word in ['compare', 'comparar', 'janeiro', 'fevereiro']) and date_cols and quantity_cols:
-                date_col = date_cols[0]
-                qty_col = quantity_cols[0]
-                
-                jan_data = df[df[date_col].astype(str).str.contains('01|janeiro|january', case=False, na=False)]
-                feb_data = df[df[date_col].astype(str).str.contains('02|fevereiro|february', case=False, na=False)]
-                
-                if not jan_data.empty and not feb_data.empty:
-                    jan_total = jan_data[qty_col].sum()
-                    feb_total = feb_data[qty_col].sum()
-                    diff = feb_total - jan_total
-                    pct_change = (diff / jan_total * 100) if jan_total != 0 else 0
-                    
-                    insights.append(f"Janeiro: {jan_total:,.0f} {qty_col}")
-                    insights.append(f"Fevereiro: {feb_total:,.0f} {qty_col}")
-                    insights.append(f"Variação: {diff:+,.0f} ({pct_change:+.1f}%)")
+            # 4) Comparação janeiro vs fevereiro 2025 (e com I/E)
+            if any(word in query_lower for word in ['compare', 'comparar', 'janeiro', 'fevereiro']) and qty_col:
+                df_cmp = df
+                # Filtrar exportação/importação se pedido
+                if any(w in query_lower for w in ['exporta', 'exportação', 'exportacao']):
+                    df_cmp = filter_ie(df_cmp, 'exportacao')
+                if any(w in query_lower for w in ['importa', 'importação', 'importacao']):
+                    df_cmp = filter_ie(df_cmp, 'importacao')
+                # Meses
+                df_jan = filter_month_year(df_cmp, 1, 2025) if date_cols else df.iloc[0:0]
+                df_feb = filter_month_year(df_cmp, 2, 2025) if date_cols else df.iloc[0:0]
+                jan_total = pd.to_numeric(df_jan[qty_col], errors='coerce').sum()
+                feb_total = pd.to_numeric(df_feb[qty_col], errors='coerce').sum()
+                diff = feb_total - jan_total
+                pct_change = (diff / jan_total * 100) if jan_total else 0
+                insights.append(f"Janeiro/2025: {jan_total:,.0f} {qty_col}")
+                insights.append(f"Fevereiro/2025: {feb_total:,.0f} {qty_col}")
+                insights.append(f"Variação: {diff:+,.0f} ({pct_change:+.1f}%)")
             
-            # Análise de tendência
-            if any(word in query_lower for word in ['tendencia', 'trend', 'ultimos', 'meses']) and date_cols and quantity_cols:
-                date_col = date_cols[0]
-                qty_col = quantity_cols[0]
-                
-                monthly_data = df.groupby(date_col)[qty_col].sum().sort_index().tail(3)
-                if len(monthly_data) >= 2:
-                    insights.append(f"Últimos 3 meses: {dict(monthly_data)}")
-                    
-                    # Calcular tendência
-                    values = monthly_data.values
-                    if len(values) >= 2:
-                        trend = values[-1] - values[0]
-                        insights.append(f"Tendência geral: {trend:+,.0f} {qty_col}")
+            # 5) Tendência últimos 3 meses
+            if any(word in query_lower for word in ['tendencia', 'tendência', 'trend', 'ultimos', 'últimos', 'meses']) and qty_col and date_cols:
+                # Tentar ordenar por uma coluna de período
+                series = df.groupby(date_col)[qty_col].sum().sort_index()
+                last3 = series.tail(3)
+                if len(last3) >= 2:
+                    insights.append(f"Últimos 3 períodos ({date_col}): {dict(last3)}")
+                    trend = last3.iloc[-1] - last3.iloc[0]
+                    insights.append(f"Tendência geral: {trend:+,.0f} {qty_col}")
             
             return "\n".join(insights) if insights else "Análise específica não disponível para esta consulta"
-            
+        
         except Exception as e:
             return f"Erro na análise específica: {str(e)}"
     
@@ -669,15 +757,27 @@ Quando não há dados disponíveis, explique claramente essa limitação e orien
         except Exception as e:
             return f"Erro ao gerar resposta: {str(e)}"
     
-    def update_knowledge_base(self, df: pd.DataFrame):
-        """Atualiza base de conhecimento com novos dados"""
-        # Limpar índice existente
+    def reset_knowledge_base(self):
+        """Reseta a base de conhecimento (limpa índice e documentos persistidos)"""
+        # Resetar estruturas em memória
         self._create_new_index()
         
-        # Recriar base de conhecimento
+        # Remover arquivos persistidos (se existirem)
+        try:
+            if os.path.exists(self.index_path):
+                os.remove(self.index_path)
+            if os.path.exists(self.documents_path):
+                os.remove(self.documents_path)
+        except Exception as e:
+            logger.error(f"Erro ao resetar base de conhecimento: {e}")
+    
+    def update_knowledge_base(self, df: pd.DataFrame):
+        """Atualiza base de conhecimento adicionando novos dados (sem resetar o índice)"""
+        if df is None or df.empty:
+            logger.debug("DataFrame vazio - nada a atualizar")
+            return
+        
+        # Adicionar documentos ao índice existente
         self.create_knowledge_base_from_data(df)
         
-        print(f"Base de conhecimento atualizada com {len(self.document_store)} documentos")
-
-# Instância global
-advanced_llm = AdvancedLLMManager()
+        logger.info(f"Base de conhecimento atualizada (incremental) com {len(self.document_store)} documentos")

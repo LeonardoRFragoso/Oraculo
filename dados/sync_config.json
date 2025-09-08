@@ -6,7 +6,7 @@
       "url": "https://docs.google.com/spreadsheets/d/1wijOMirmPmhCl72xzd5HjKUfAOgX0eJd/edit?gid=985191016#gid=985191016",
       "type": "url",
       "last_hash": "d53f965da68fa63ac209acfe74d7d0d5",
-      "last_check": "2025-09-08T17:21:54.555422",
+      "last_check": "2025-09-08T20:26:07.379811",
       "last_update": "2025-09-08T17:21:54.555416",
       "record_count": 2552,
       "enabled": true
@@ -17,7 +17,7 @@
       "url": "https://docs.google.com/spreadsheets/d/1Iy-kkW7uvcFEKJ3i_UBbCnFyUqa0su2G/edit?gid=506309647#gid=506309647",
       "type": "url",
       "last_hash": "25ccc01feb1c6b7623f0439e59291d02",
-      "last_check": "2025-09-08T17:22:06.145438",
+      "last_check": "2025-09-08T20:26:22.718699",
       "last_update": "2025-09-08T17:22:06.145432",
       "record_count": 14843,
       "enabled": true
@@ -28,7 +28,7 @@
       "url": "https://docs.google.com/spreadsheets/d/1kvjmYigg06aEOrgFG4gRFwzCIjTrns2P/edit?gid=531830993#gid=531830993",
       "type": "url",
       "last_hash": "d8d26d6abddaee433a9c0144075ab2c1",
-      "last_check": "2025-09-08T17:22:14.064472",
+      "last_check": "2025-09-08T20:26:36.772486",
       "last_update": "2025-09-08T17:22:14.064467",
       "record_count": 24435,
       "enabled": true
@@ -38,10 +38,43 @@
       "name": "Planilha edit?gid=1166907189#...",
       "url": "https://docs.google.com/spreadsheets/d/1vrpJmvfOviNeE1yTMv4ikdcOPceGidYg/edit?gid=1166907189#gid=1166907189",
       "type": "url",
-      "last_hash": "0d5753f7a89bd90c42c986ed438f89c4",
-      "last_check": "2025-09-08T17:22:16.106289",
-      "last_update": "2025-09-07T21:45:22.045489",
-      "record_count": 3935,
+      "last_hash": "1464f3bbcd69d6a56646201dbe174065",
+      "last_check": "2025-09-08T20:26:44.576025",
+      "last_update": "2025-09-08T20:26:44.576007",
+      "record_count": 3684,
+      "enabled": true
+    },
+    {
+      "id": "4b4c8cec3a30ac1bf1206944dcb6a53f",
+      "name": "Planilha edit?usp=drive_link&...",
+      "url": "https://docs.google.com/spreadsheets/d/17wzkwIhyWghRW7C4f2JjXt-l_5DPOaP3/edit?usp=drive_link&ouid=112919818123912388450&rtpof=true&sd=true",
+      "type": "url",
+      "last_hash": "e7e909b1a65128aca945ff244b31fd49",
+      "last_check": "2025-09-08T20:32:55.028581",
+      "last_update": "2025-09-08T20:32:55.028593",
+      "record_count": 3088,
+      "enabled": true
+    },
+    {
+      "id": "98a2741da0f69a5a4378b957df02ca05",
+      "name": "Planilha edit?usp=drive_link&...",
+      "url": "https://docs.google.com/spreadsheets/d/1KGOknXxWYwmbRjpnB0JcwNe4QA6k3enX/edit?usp=drive_link&ouid=112919818123912388450&rtpof=true&sd=true",
+      "type": "url",
+      "last_hash": "01edac6dccd3eee8063df6584c4c11eb",
+      "last_check": "2025-09-08T20:33:47.456721",
+      "last_update": "2025-09-08T20:33:47.456726",
+      "record_count": 756,
+      "enabled": true
+    },
+    {
+      "id": "2bf9653908ca0a8ac9ae2ca7abb69dd5",
+      "name": "Planilha edit?usp=drive_link&...",
+      "url": "https://docs.google.com/spreadsheets/d/1goUwyjiCgl4t8ppt5vCPu7vKR6BTPa_-/edit?usp=drive_link&ouid=112919818123912388450&rtpof=true&sd=true",
+      "type": "url",
+      "last_hash": "c36af1c76725592d024a230bc317357b",
+      "last_check": "2025-09-08T20:33:56.631117",
+      "last_update": "2025-09-08T20:33:56.631121",
+      "record_count": 45,
       "enabled": true
     }
   ],
