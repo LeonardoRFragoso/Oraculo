@@ -98,8 +98,9 @@ class UniversalCloudIntegrator:
             gid_match = re.search(gid_pattern, url)
             gid = gid_match.group(1) if gid_match else '0'
             
-            # URL para export CSV
-            return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+            # Tentar múltiplas URLs de export
+            # Primeiro tentar com usp=sharing para garantir acesso público
+            return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}&usp=sharing"
         
         return url
     
@@ -146,12 +147,16 @@ class UniversalCloudIntegrator:
     
     def download_file_from_url(self, url: str) -> Optional[bytes]:
         """
-        Baixar arquivo de uma URL
+        Baixar arquivo de uma URL com fallbacks para Google Sheets
         """
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }
+            
+            # Se for Google Sheets e falhar, tentar URLs alternativas
+            if 'docs.google.com' in url:
+                return self._download_google_sheets_with_fallback(url, headers)
             
             response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
@@ -161,6 +166,59 @@ class UniversalCloudIntegrator:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Erro ao baixar arquivo: {str(e)}")
             return None
+    
+    def _download_google_sheets_with_fallback(self, url: str, headers: dict) -> Optional[bytes]:
+        """
+        Tentar baixar Google Sheets com múltiplas estratégias de fallback
+        """
+        # Extrair sheet ID e GID
+        sheet_id_pattern = r'/spreadsheets/d/([a-zA-Z0-9-_]+)'
+        match = re.search(sheet_id_pattern, url)
+        
+        if not match:
+            # Se não conseguir extrair ID, tentar URL original
+            response = requests.get(url, headers=headers, timeout=30)
+            response.raise_for_status()
+            return response.content
+        
+        sheet_id = match.group(1)
+        gid_pattern = r'[#&]gid=([0-9]+)'
+        gid_match = re.search(gid_pattern, url)
+        gid = gid_match.group(1) if gid_match else '0'
+        
+        # Lista de URLs para tentar em ordem de prioridade
+        fallback_urls = [
+            f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}&usp=sharing",
+            f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}",
+            f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid={gid}",
+            f"https://docs.google.com/spreadsheets/d/{sheet_id}/pub?gid={gid}&single=true&output=csv"
+        ]
+        
+        last_error = None
+        for attempt_url in fallback_urls:
+            try:
+                self.logger.info(f"Tentando URL: {attempt_url}")
+                response = requests.get(attempt_url, headers=headers, timeout=30)
+                response.raise_for_status()
+                
+                # Verificar se o conteúdo não é uma página de erro HTML
+                content = response.content
+                if b'<!DOCTYPE html>' not in content and b'<html' not in content:
+                    self.logger.info(f"Sucesso com URL: {attempt_url}")
+                    return content
+                else:
+                    self.logger.warning(f"URL retornou HTML (página de erro): {attempt_url}")
+                    
+            except requests.exceptions.RequestException as e:
+                last_error = e
+                self.logger.warning(f"Falha na URL {attempt_url}: {str(e)}")
+                continue
+        
+        # Se todas as tentativas falharam, lançar o último erro
+        if last_error:
+            raise last_error
+        
+        return None
     
     def load_spreadsheet_from_url(self, url: str) -> Optional[pd.DataFrame]:
         """

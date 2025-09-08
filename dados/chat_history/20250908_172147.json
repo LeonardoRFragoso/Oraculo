@@ -1,0 +1,22 @@
+{
+  "id": "20250908_172147",
+  "created_at": "2025-09-08T17:23:20.350303",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Quais são os 10 maiores clientes por volume de containers?"
+    },
+    {
+      "role": "assistant",
+      "content": "Desculpe, mas os dados fornecidos não incluem informações sobre o volume de containers por cliente. Preciso de dados mais específicos para fornecer essa informação."
+    },
+    {
+      "role": "user",
+      "content": "Quais são os 10 maiores clientes por volume de containers?"
+    },
+    {
+      "role": "assistant",
+      "content": "Desculpe, mas os dados fornecidos não incluem informações sobre o volume de containers por cliente. Preciso de dados mais específicos para fornecer essa informação."
+    }
+  ]
+}
