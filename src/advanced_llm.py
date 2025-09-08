@@ -305,17 +305,61 @@ class AdvancedLLMManager:
             
             # Análise detalhada do DataFrame atual
             if not df.empty:
-                context_parts.append("\n=== ANÁLISE DOS DADOS ATUAIS ===")
+                context_parts.append("\n=== ANÁLISE DETALHADA DOS DADOS ===")
                 
                 # Informações básicas
                 context_parts.append(f"Total de registros: {len(df):,}")
-                context_parts.append(f"Colunas disponíveis: {', '.join(df.columns)}")
+                context_parts.append(f"Total de colunas: {len(df.columns)}")
                 
-                # Detectar e analisar colunas automaticamente
+                # Análise detalhada de cada coluna
+                context_parts.append("\n--- ESTRUTURA DAS COLUNAS ---")
+                for col in df.columns:
+                    dtype = str(df[col].dtype)
+                    non_null = df[col].notna().sum()
+                    unique_vals = df[col].nunique()
+                    
+                    # Mostrar alguns valores únicos para entender o conteúdo
+                    sample_values = df[col].dropna().unique()[:5]
+                    sample_str = ", ".join([str(v) for v in sample_values])
+                    
+                    context_parts.append(f"{col}: {dtype} | {non_null:,} valores | {unique_vals:,} únicos | Ex: {sample_str}")
+                
+                # Detectar colunas por categoria
                 numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
                 date_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['data', 'mes', 'ano', 'periodo'])]
                 client_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['cliente', 'consignatario', 'importador', 'exportador'])]
                 quantity_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['qtd', 'quantidade', 'container', 'teus', 'volumes'])]
+                
+                context_parts.append(f"\n--- CATEGORIZAÇÃO AUTOMÁTICA ---")
+                context_parts.append(f"Colunas numéricas: {numeric_cols}")
+                context_parts.append(f"Colunas de data/período: {date_cols}")
+                context_parts.append(f"Colunas de cliente: {client_cols}")
+                context_parts.append(f"Colunas de quantidade: {quantity_cols}")
+                
+                # Análise específica de datas para março 2025
+                context_parts.append(f"\n--- ANÁLISE DE DATAS PARA MARÇO 2025 ---")
+                for col in date_cols:
+                    # Verificar diferentes formatos de data
+                    march_2025_patterns = ['2025-03', '03/2025', 'março', 'mar/25', '2025/03', '03-2025']
+                    
+                    for pattern in march_2025_patterns:
+                        matches = df[df[col].astype(str).str.contains(pattern, case=False, na=False)]
+                        if len(matches) > 0:
+                            context_parts.append(f"Coluna {col} - padrão '{pattern}': {len(matches)} registros encontrados")
+                            # Mostrar alguns exemplos
+                            examples = matches[col].unique()[:3]
+                            context_parts.append(f"  Exemplos: {', '.join([str(e) for e in examples])}")
+                
+                # Verificar se há dados de 2025
+                context_parts.append(f"\n--- VERIFICAÇÃO DE DADOS 2025 ---")
+                for col in df.columns:
+                    data_2025 = df[df[col].astype(str).str.contains('2025', na=False)]
+                    if len(data_2025) > 0:
+                        context_parts.append(f"Coluna {col}: {len(data_2025)} registros com '2025'")
+                        # Mostrar distribuição por mês se possível
+                        if any(month in col.lower() for month in ['mes', 'month', 'data']):
+                            month_dist = data_2025[col].value_counts().head(5)
+                            context_parts.append(f"  Distribuição: {dict(month_dist)}")
                 
                 # Estatísticas por colunas de quantidade
                 if quantity_cols:
@@ -381,14 +425,18 @@ class AdvancedLLMManager:
             - Responder perguntas sobre performance e metas com números precisos
             
             Diretrizes OBRIGATÓRIAS de resposta:
-            - SEMPRE use números específicos e dados reais fornecidos no contexto
-            - SEMPRE cite as fontes dos dados (ex: "Baseado nos dados analisados...")
-            - SEMPRE forneça análises quantitativas detalhadas
+            - SEMPRE analise a estrutura detalhada dos dados fornecida no contexto
+            - SEMPRE use os tipos de dados e exemplos de valores para entender o formato correto
+            - SEMPRE procure por dados em TODAS as colunas relevantes, não apenas nas óbvias
+            - Se uma consulta retorna 0 resultados, EXPLIQUE especificamente quais colunas foram verificadas e por que não encontrou dados
+            - SEMPRE cite as colunas específicas usadas na análise (ex: "Baseado na coluna 'DATA_EMBARQUE'...")
+            - SEMPRE forneça análises quantitativas detalhadas quando há dados
             - SEMPRE inclua comparações, tendências e insights acionáveis
             - NUNCA dê respostas genéricas sem dados específicos
-            - Se não houver dados suficientes, seja específico sobre o que está faltando
+            - Se não houver dados suficientes, seja específico sobre quais colunas e formatos foram verificados
             - Formate números com separadores de milhares (ex: 1.234 containers)
             - Inclua percentuais e variações quando relevante
+            - Use a análise detalhada de colunas para identificar o formato correto de datas e valores
             """
             
             user_prompt = f"""
