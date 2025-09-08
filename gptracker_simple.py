@@ -15,6 +15,7 @@ load_dotenv()
 # Importar módulos necessários
 from src.advanced_llm import AdvancedLLMManager
 from src.auth import auth_manager
+from src.export_manager import ExportManager
 import pandas as pd
 
 # Configuração da página
@@ -205,6 +206,9 @@ def initialize_session():
     
     if 'llm_manager' not in st.session_state:
         st.session_state.llm_manager = AdvancedLLMManager()
+    
+    if 'export_manager' not in st.session_state:
+        st.session_state.export_manager = ExportManager()
 
 def render_sidebar():
     """Renderiza barra lateral com histórico"""
@@ -474,11 +478,60 @@ def render_chat():
     
     with chat_container:
         # Exibir mensagens
-        for message in st.session_state.messages:
+        for i, message in enumerate(st.session_state.messages):
             if message["role"] == "user":
                 st.markdown(f'<div class="user-message">{message["content"]}</div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="assistant-message">{message["content"]}</div>', unsafe_allow_html=True)
+                
+                # Verificar se a resposta contém dados tabulares e oferecer downloads
+                if st.session_state.export_manager.detect_tabular_data(message["content"]):
+                    col1, col2, col3 = st.columns([1, 1, 4])
+                    
+                    with col1:
+                        # Gerar título baseado na pergunta do usuário
+                        user_question = ""
+                        if i > 0 and st.session_state.messages[i-1]["role"] == "user":
+                            user_question = st.session_state.messages[i-1]["content"][:50] + "..."
+                        
+                        title = user_question or f"Relatório {datetime.now().strftime('%d/%m/%Y')}"
+                        
+                        # Botão PDF
+                        if st.button(f"📄 PDF", key=f"pdf_{i}", help="Baixar como PDF"):
+                            try:
+                                pdf_data = st.session_state.export_manager.generate_pdf(
+                                    title, 
+                                    message["content"],
+                                    st.session_state.export_manager.extract_data_from_response(message["content"])
+                                )
+                                st.download_button(
+                                    label="📄 Baixar PDF",
+                                    data=pdf_data,
+                                    file_name=f"gptracker_relatorio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                    mime="application/pdf",
+                                    key=f"download_pdf_{i}"
+                                )
+                            except Exception as e:
+                                st.error(f"Erro ao gerar PDF: {str(e)}")
+                    
+                    with col2:
+                        # Botão Excel
+                        if st.button(f"📊 Excel", key=f"excel_{i}", help="Baixar como Excel"):
+                            try:
+                                excel_data = st.session_state.export_manager.generate_excel(
+                                    title,
+                                    message["content"],
+                                    st.session_state.export_manager.extract_data_from_response(message["content"])
+                                )
+                                st.download_button(
+                                    label="📊 Baixar Excel",
+                                    data=excel_data,
+                                    file_name=f"gptracker_relatorio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    key=f"download_excel_{i}"
+                                )
+                            except Exception as e:
+                                st.error(f"Erro ao gerar Excel: {str(e)}")
     
     # Input para nova mensagem
     st.markdown("---")
