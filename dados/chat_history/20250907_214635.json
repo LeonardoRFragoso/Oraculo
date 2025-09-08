@@ -1,0 +1,22 @@
+{
+  "id": "20250907_214635",
+  "created_at": "2025-09-07T21:48:22.186082",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Quais são os 10 maiores clientes por volume de containers?"
+    },
+    {
+      "role": "assistant",
+      "content": "Desculpe, mas os dados fornecidos não incluem informações sobre o volume de containers de nenhum cliente. Preciso de dados mais específicos para fornecer essa informação."
+    },
+    {
+      "role": "user",
+      "content": "qual veiculo mais levou multas em 2025?"
+    },
+    {
+      "role": "assistant",
+      "content": "Desculpe, mas os dados fornecidos não incluem informações sobre multas de veículos em 2025. Preciso de dados mais específicos para fornecer essa informação."
+    }
+  ]
+}

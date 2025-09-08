@@ -6,7 +6,7 @@
       "url": "https://docs.google.com/spreadsheets/d/1wijOMirmPmhCl72xzd5HjKUfAOgX0eJd/edit?gid=985191016#gid=985191016",
       "type": "url",
       "last_hash": "1d06ae0244cef79f1c90f13b9d77d145",
-      "last_check": "2025-09-07T20:34:52.646303",
+      "last_check": "2025-09-07T21:43:11.251271",
       "last_update": "2025-09-07T20:14:39.050807",
       "record_count": 2503,
       "enabled": true
@@ -17,9 +17,31 @@
       "url": "https://docs.google.com/spreadsheets/d/1Iy-kkW7uvcFEKJ3i_UBbCnFyUqa0su2G/edit?gid=506309647#gid=506309647",
       "type": "url",
       "last_hash": "46a428bbb08463df1a488bd0d0ea8e5d",
-      "last_check": "2025-09-07T20:37:22.679366",
+      "last_check": "2025-09-07T21:43:15.685803",
       "last_update": "2025-09-07T20:37:22.679373",
       "record_count": 13797,
+      "enabled": true
+    },
+    {
+      "id": "33b9a0ca37db19817ee303751bea31c0",
+      "name": "Planilha edit?gid=531830993#g...",
+      "url": "https://docs.google.com/spreadsheets/d/1kvjmYigg06aEOrgFG4gRFwzCIjTrns2P/edit?gid=531830993#gid=531830993",
+      "type": "url",
+      "last_hash": "cf1c401da5145c91c5ab936467a7d54b",
+      "last_check": "2025-09-07T21:43:21.802993",
+      "last_update": "2025-09-07T21:42:42.710238",
+      "record_count": 24431,
+      "enabled": true
+    },
+    {
+      "id": "a39fe42c8822220067502aedc4fde352",
+      "name": "Planilha edit?gid=1166907189#...",
+      "url": "https://docs.google.com/spreadsheets/d/1vrpJmvfOviNeE1yTMv4ikdcOPceGidYg/edit?gid=1166907189#gid=1166907189",
+      "type": "url",
+      "last_hash": "0d5753f7a89bd90c42c986ed438f89c4",
+      "last_check": "2025-09-07T21:45:22.045482",
+      "last_update": "2025-09-07T21:45:22.045489",
+      "record_count": 3935,
       "enabled": true
     }
   ],
