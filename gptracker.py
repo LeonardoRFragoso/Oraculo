@@ -608,26 +608,38 @@ Sem a chave da OpenAI, não posso processar suas perguntas.
                                 # Consolidar todos os DataFrames
                                 combined_df = pd.concat(dataframes, ignore_index=True, sort=False)
                                 
-                                # Mostrar informações consolidadas
-                                with st.expander("📊 Dados Consolidados", expanded=False):
-                                    st.write(f"**Total de arquivos:** {len(dataframes)}")
-                                    st.write(f"**Total de registros:** {len(combined_df):,}")
-                                    st.write("**Arquivos processados:**")
-                                    for info in file_info:
-                                        st.write(f"  - {info}")
+                                # Mostrar informações consolidadas - SEMPRE visível
+                                with st.expander("📊 Dados Consolidados - CLIQUE AQUI", expanded=True):
+                                    st.success(f"✅ **{len(dataframes)} arquivos consolidados com {len(combined_df):,} registros totais**")
                                     
-                                    # Verificar dados ACCUMED se pergunta for sobre ela
-                                    if 'accumed' in user_input.lower():
-                                        accumed_cols = [col for col in combined_df.columns if any(keyword in col.lower() for keyword in ['cliente', 'consignatario', 'importador', 'exportador'])]
-                                        if accumed_cols:
-                                            accumed_data = combined_df[combined_df[accumed_cols[0]].str.contains('ACCUMED', case=False, na=False)]
-                                            st.write(f"**Registros ACCUMED encontrados:** {len(accumed_data)}")
-                                            if len(accumed_data) > 0:
-                                                # Mostrar distribuição por arquivo
-                                                accumed_by_file = accumed_data['arquivo_origem'].value_counts()
-                                                st.write("**Distribuição ACCUMED por arquivo:**")
-                                                for arquivo, count in accumed_by_file.items():
-                                                    st.write(f"  - {arquivo}: {count} registros")
+                                    st.write("**📁 Arquivos processados:**")
+                                    for info in file_info:
+                                        st.write(f"  • {info}")
+                                    
+                                    st.write(f"**📋 Colunas disponíveis:** {', '.join(combined_df.columns[:10])}{'...' if len(combined_df.columns) > 10 else ''}")
+                                    
+                                    # Verificar dados ACCUMED sempre
+                                    accumed_cols = [col for col in combined_df.columns if any(keyword in col.lower() for keyword in ['cliente', 'consignatario', 'importador', 'exportador'])]
+                                    if accumed_cols:
+                                        accumed_data = combined_df[combined_df[accumed_cols[0]].str.contains('ACCUMED', case=False, na=False)]
+                                        if len(accumed_data) > 0:
+                                            st.write(f"🎯 **Registros ACCUMED encontrados:** {len(accumed_data)}")
+                                            # Mostrar distribuição por arquivo
+                                            accumed_by_file = accumed_data['arquivo_origem'].value_counts()
+                                            st.write("**📊 Distribuição ACCUMED por arquivo:**")
+                                            for arquivo, count in accumed_by_file.items():
+                                                st.write(f"  • {arquivo}: {count} registros")
+                                            
+                                            # Mostrar anos disponíveis
+                                            if any('ano' in col.lower() or 'data' in col.lower() for col in accumed_data.columns):
+                                                anos_cols = [col for col in accumed_data.columns if 'ano' in col.lower() or 'data' in col.lower()]
+                                                if anos_cols:
+                                                    anos_unicos = accumed_data[anos_cols[0]].astype(str).str[:4].unique()
+                                                    st.write(f"**📅 Anos com dados ACCUMED:** {', '.join(sorted(anos_unicos))}")
+                                        else:
+                                            st.warning("⚠️ Nenhum registro ACCUMED encontrado nos dados consolidados")
+                                    else:
+                                        st.warning("⚠️ Nenhuma coluna de cliente/consignatário encontrada")
                     
                     # Usar o método aprimorado com dados consolidados
                     if combined_df is not None and not combined_df.empty:
