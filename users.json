@@ -1,0 +1,39 @@
+{
+  "admin": {
+    "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "role": "admin",
+    "permissions": [
+      "read",
+      "write",
+      "admin",
+      "analytics",
+      "budget"
+    ],
+    "created_at": "2025-09-07T19:36:06.209835",
+    "last_login": "2025-09-07T21:17:27.543294",
+    "active": true
+  },
+  "comercial": {
+    "password": "e7fe30c4c1efcaeeacfc35ffbebdc95989cea70c1a9867e57f23edd87f0f89e8",
+    "role": "comercial",
+    "permissions": [
+      "read",
+      "analytics",
+      "budget"
+    ],
+    "created_at": "2025-09-07T19:36:06.221779",
+    "last_login": null,
+    "active": true
+  },
+  "operacional": {
+    "password": "60c2ea96d408e418425c77197f5e5cc8afcd8d8a26d8876802bb3cea7f486710",
+    "role": "operacional",
+    "permissions": [
+      "read",
+      "analytics"
+    ],
+    "created_at": "2025-09-07T19:36:06.232712",
+    "last_login": null,
+    "active": true
+  }
+}

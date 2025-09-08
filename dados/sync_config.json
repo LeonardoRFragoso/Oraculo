@@ -1,0 +1,29 @@
+{
+  "sources": [
+    {
+      "id": "bc77cd86f13655a2518c02808d875553",
+      "name": "Planilha edit?gid=985191016#g...",
+      "url": "https://docs.google.com/spreadsheets/d/1wijOMirmPmhCl72xzd5HjKUfAOgX0eJd/edit?gid=985191016#gid=985191016",
+      "type": "url",
+      "last_hash": "1d06ae0244cef79f1c90f13b9d77d145",
+      "last_check": "2025-09-07T20:34:52.646303",
+      "last_update": "2025-09-07T20:14:39.050807",
+      "record_count": 2503,
+      "enabled": true
+    },
+    {
+      "id": "2f867da70565c5150d4114a352d6e0a0",
+      "name": "Planilha edit?gid=506309647#g...",
+      "url": "https://docs.google.com/spreadsheets/d/1Iy-kkW7uvcFEKJ3i_UBbCnFyUqa0su2G/edit?gid=506309647#gid=506309647",
+      "type": "url",
+      "last_hash": "46a428bbb08463df1a488bd0d0ea8e5d",
+      "last_check": "2025-09-07T20:37:22.679366",
+      "last_update": "2025-09-07T20:37:22.679373",
+      "record_count": 13797,
+      "enabled": true
+    }
+  ],
+  "settings": {
+    "check_interval": 300
+  }
+}
