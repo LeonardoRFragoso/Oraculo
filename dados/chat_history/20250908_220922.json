@@ -1,0 +1,30 @@
+{
+  "id": "20250908_220922",
+  "created_at": "2025-09-08T22:10:47.407498",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Quais são os principais armadores que operaram no porto de Santos em 2024, ordenados por quantidade de containers?"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\n2024: 0 containers\nPorto de Santos (todas as datas): 32 containers\n\nFonte: dados consolidados (10,713 registros)."
+    },
+    {
+      "role": "user",
+      "content": "Quantos containers foram movimentados pelo consignatário ACCUMED PRODUTOS MEDICO HOSPITALARES LTDA em 2024?"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\nCliente 'Cliente': 0 containers\nDistribuição por período: {}\n2024: 0 containers\n\nFonte: dados consolidados (10,713 registros)."
+    },
+    {
+      "role": "user",
+      "content": "Compare o volume de exportações entre janeiro e fevereiro de 2025"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\n2025: 17,996 containers\nPorto de Santos (todas as datas): 32 containers\nTop armadores em Santos: {'MAERSK LINE': 32, 'MSC': 0}\nJaneiro/2025: 1,034 containers\nFevereiro/2025: 2,852 containers\nVariação: +1,818 (+175.8%)\n\nFonte: dados consolidados (10,713 registros)."
+    }
+  ]
+}

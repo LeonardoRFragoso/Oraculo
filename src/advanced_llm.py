@@ -407,7 +407,17 @@ class AdvancedLLMManager:
                 
                 # Responder perguntas específicas baseadas na query
                 context_parts.append(f"\n=== ANÁLISE ESPECÍFICA PARA A PERGUNTA ===")
-                context_parts.append(self._analyze_specific_query(query, df))
+                specific_analysis = self._analyze_specific_query(query, df)
+                context_parts.append(specific_analysis)
+
+                # Se a análise específica trouxe números concretos, priorizar uma resposta direta
+                if specific_analysis and "Análise específica não disponível" not in specific_analysis and "Erro na análise específica" not in specific_analysis:
+                    direct_answer = (
+                        "RESPOSTA DIRETA\n"
+                        f"{specific_analysis}\n\n"
+                        f"Fonte: dados consolidados ({len(df):,} registros)."
+                    )
+                    return direct_answer
             
             # Adicionar dados da base de conhecimento como complemento
             if relevant_docs:
@@ -488,14 +498,20 @@ class AdvancedLLMManager:
                 )
                 return s.translate(table)
             
+            # Query normalizada para matching robusto
+            q_norm = _norm(query)
+            
+            # Trabalhar em uma cópia e garantir numérico na coluna de quantidade quando identificada
+            df_work = df.copy()
+            
             # Mapear colunas originais -> normalizadas
             norm_cols = {col: _norm(col) for col in df.columns}
             
             # Detectar colunas automaticamente (com normalização)
             client_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['cliente', 'consignat', 'importador', 'exportador'])]
-            quantity_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['qtd', 'qtde', 'container', 'teus', 'volumes'])]
+            quantity_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['qtd', 'qtde', 'qte', 'quant', 'container', 'cont', 'teus', 'volumes'])]
             # Priorizar colunas com nomes mais específicos
-            quantity_cols = sorted(quantity_cols, key=lambda c: (0 if 'qtd' in _norm(c) or 'qtde' in _norm(c) else 1))
+            quantity_cols = sorted(quantity_cols, key=lambda c: (0 if any(k in _norm(c) for k in ['qtd', 'qtde', 'qte']) else 1))
             
             date_cols = []
             for col, ncol in norm_cols.items():
@@ -506,31 +522,89 @@ class AdvancedLLMManager:
             armador_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['armador', 'shipping', 'carrier'])]
             ie_cols = [col for col, ncol in norm_cols.items() if any(k in ncol for k in ['i/e', 'ie', 'importa', 'exporta', 'operacao', 'operac'])]
             
+            # Escolher melhor coluna de período priorizando ano_mes e datas de movimento/embarque
+            def _date_score(col_name: str) -> int:
+                n = _norm(col_name)
+                score = 0
+                if 'ano_mes' in n or 'ano/mes' in n or 'ano-mes' in n or 'mes/ano' in n:
+                    score += 6
+                if 'data mov' in n or 'mov' in n:
+                    score += 5
+                if 'embarque' in n:
+                    score += 4
+                if 'eta' in n or 'ets' in n:
+                    score += 3
+                if 'pagament' in n or 'fatura' in n or 'desconto' in n or 'emissao' in n or 'emissão' in n:
+                    score -= 5
+                if 'data' in n:
+                    score += 1
+                if 'mes' in n or 'mês' in n:
+                    score += 1
+                return score
+            date_cols = sorted(date_cols, key=_date_score, reverse=True)
+            
             # Helpers de filtro
+            year_cols = [c for c, n in norm_cols.items() if 'ano' in n]
+            month_cols = [c for c, n in norm_cols.items() if 'mes' in n or 'mês' in n]
+
             def filter_year(df_local, year):
+                # 1) Colunas explícitas de ano
+                for col in year_cols:
+                    try:
+                        m = pd.to_numeric(df_local[col], errors='coerce') == int(year)
+                        if m.any():
+                            return df_local[m]
+                    except Exception:
+                        continue
+                # 2) Colunas de período (texto)
                 for col in date_cols:
                     try:
-                        # Tenta por texto
                         mask = df_local[col].astype(str).str.contains(str(year), case=False, na=False)
                         if mask.any():
                             return df_local[mask]
                     except Exception:
                         continue
+                # 3) Fallback: usar período canônico se existir
+                try:
+                    if '__period' in df_local.columns:
+                        m = df_local['__period'].astype(str).str.contains(str(year), na=False)
+                        if m.any():
+                            return df_local[m]
+                except Exception:
+                    pass
                 return df_local.iloc[0:0]
             
             def filter_month_year(df_local, month, year):
-                # tenta formatos usuais: 03/2025, 2025-03, 202503
+                # 1) Colunas separadas de ano/mês
+                for ycol in year_cols:
+                    try:
+                        ym = pd.to_numeric(df_local[ycol], errors='coerce') == int(year)
+                    except Exception:
+                        ym = None
+                    if ym is None or not ym.any():
+                        continue
+                    for mcol in month_cols:
+                        try:
+                            mm = pd.to_numeric(df_local[mcol], errors='coerce') == int(month)
+                            if mm.any():
+                                return df_local[ym & mm]
+                        except Exception:
+                            continue
+                # 2) Colunas de período em texto: 03/2025, 2025-03, 202503, 03-2025
                 patterns = [f"{month:02d}/{year}", f"{year}-{month:02d}", f"{year}{month:02d}", f"{month:02d}-{year}"]
                 for col in date_cols:
-                    col_str = df_local[col].astype(str)
-                    mask_any = False
-                    mask = None
-                    for p in patterns:
-                        m = col_str.str.contains(p, case=False, na=False)
-                        mask = m if mask is None else (mask | m)
-                        mask_any = mask_any or m.any()
-                    if mask_any:
-                        return df_local[mask]
+                    try:
+                        col_str = df_local[col].astype(str)
+                        mask_any = False
+                        mask = None
+                        for p in patterns:
+                            m = col_str.str.contains(p, case=False, na=False)
+                            mask = m if mask is None else (mask | m)
+                            mask_any = mask_any or m.any()
+                        if mask_any:
+                            return df_local[mask]
+                    except Exception:
+                        continue
                 return df_local.iloc[0:0]
             
             def filter_ie(df_local, tipo):
@@ -542,15 +616,15 @@ class AdvancedLLMManager:
                     s = df_local[col].astype(str).apply(_norm)
                     if 'i/e' in ncol or 'ie' in ncol:
                         if 'i' in tipo:
-                            m = s.str.contains('^i$', na=False) | s.str.contains('import', na=False)
+                            m = s.str.contains('^i$', na=False) | s.str.contains('imp', na=False) | s.str.contains('import', na=False)
                         else:
-                            m = s.str.contains('^e$', na=False) | s.str.contains('export', na=False)
+                            m = s.str.contains('^e$', na=False) | s.str.contains('exp', na=False) | s.str.contains('export', na=False)
                         return df_local[m]
                     else:
-                        if 'import' in tipo:
-                            m = s.str.contains('import', na=False)
+                        if 'import' in tipo or 'imp' in tipo:
+                            m = s.str.contains('import', na=False) | s.str.contains('imp', na=False)
                         else:
-                            m = s.str.contains('export', na=False)
+                            m = s.str.contains('export', na=False) | s.str.contains('exp', na=False)
                         return df_local[m]
                 return df_local
             
@@ -568,58 +642,206 @@ class AdvancedLLMManager:
                 return df_local[mask] if mask is not None else df_local.iloc[0:0]
             
             # Preparos básicos
-            qty_col = quantity_cols[0] if quantity_cols else None
+            # Funções auxiliares para identificar melhor a coluna de quantidade
+            def _to_numeric_clean(series):
+                try:
+                    s = pd.to_numeric(series, errors='coerce')
+                    if s.notna().sum() > 0:
+                        return s
+                except Exception:
+                    pass
+                try:
+                    s = series.astype(str).str.replace(r'[^0-9\-]', '', regex=True)
+                    return pd.to_numeric(s, errors='coerce')
+                except Exception:
+                    return pd.to_numeric(series, errors='coerce')
+
+            def _name_score(n: str) -> int:
+                # Maior prioridade para nomes claros de quantidade
+                score = 0
+                if any(k in n for k in ['qtd', 'qtde', 'qte', 'quant']):
+                    score += 10
+                if any(k in n for k in ['container', 'cntr', 'cont']):
+                    score += 8
+                if 'teus' in n:
+                    score += 6
+                if 'volume' in n or 'volumes' in n:
+                    score += 5
+                # Penalizações para colunas indevidas
+                if any(k in n for k in ['data', 'pagament', 'desconto', 'fatura', 'emissao', 'emissão', 'nota', 'nfe', 'document']):
+                    score -= 20
+                return score
+
+            def _pick_qty_col(df_local):
+                best = (None, -10, -1.0, -1.0)  # (col, name_score, valid_ratio, total_sum)
+                for c in quantity_cols:
+                    try:
+                        n = _norm(c)
+                        ns = _name_score(n)
+                        s = _to_numeric_clean(df_local[c])
+                        valid_ratio = float(s.notna().mean()) if len(s) else 0.0
+                        if valid_ratio < 0.05:  # precisa ter pelo menos 5% de valores numéricos
+                            continue
+                        total = float(s.sum(skipna=True)) if not pd.isna(s.sum()) else 0.0
+                        cand = (c, ns, valid_ratio, total)
+                        if (cand[1], cand[2], cand[3]) > (best[1], best[2], best[3]):
+                            best = cand
+                    except Exception:
+                        continue
+                col = best[0]
+                # Determinar rótulo amigável
+                unit = 'containers'
+                if col:
+                    n = _norm(col)
+                    if 'teus' in n:
+                        unit = 'TEUs'
+                    elif 'volume' in n or 'volumes' in n:
+                        unit = 'volumes'
+                return col, unit
+
+            qty_col, unit_label = _pick_qty_col(df_work) if quantity_cols else (None, 'containers')
             date_col = date_cols[0] if date_cols else None
             client_col = client_cols[0] if client_cols else None
             armador_col = armador_cols[0] if armador_cols else None
             
+            # Converter coluna de quantidade para numérico na cópia de trabalho
+            if qty_col:
+                try:
+                    df_work[qty_col] = _to_numeric_clean(df_work[qty_col])
+                except Exception:
+                    pass
+
+            # Helper para converter Series -> dict com ints simples (evitar np.int64 na saída)
+            def _pyint_dict(series, n=6):
+                out = {}
+                for k, v in series.tail(n).items():
+                    try:
+                        out[str(k)] = int(v)
+                    except Exception:
+                        try:
+                            out[str(k)] = float(v)
+                        except Exception:
+                            out[str(k)] = 0
+                return out
+
+            # Construir coluna de período (YYYY-MM) priorizando ano_mes / ano+mes / melhor data mensal
+            def _build_period(df_local):
+                # 1) ano_mes diretamente
+                for c, n in norm_cols.items():
+                    if 'ano_mes' in n or 'ano/mes' in n or 'ano-mes' in n or 'mes/ano' in n:
+                        return df_local[c].astype(str), c
+                # 2) ano + mes separados
+                ycol = next((c for c in year_cols), None)
+                mcol = next((c for c in month_cols), None)
+                if ycol is not None and mcol is not None:
+                    try:
+                        y = pd.to_numeric(df_local[ycol], errors='coerce').fillna(0).astype(int)
+                        m = pd.to_numeric(df_local[mcol], errors='coerce').fillna(0).astype(int)
+                        period = y.astype(str) + '-' + m.apply(lambda x: f"{int(x):02d}")
+                        return period, f"{ycol}+{mcol}"
+                    except Exception:
+                        pass
+                # 3) Melhor coluna de data convertida para mensal
+                if date_col is not None:
+                    try:
+                        dt = pd.to_datetime(df_local[date_col], errors='coerce', dayfirst=True)
+                        period = dt.dt.to_period('M').astype(str)
+                        return period, date_col
+                    except Exception:
+                        pass
+                # 4) Fallback: string vazia
+                return pd.Series([''] * len(df_local)), 'periodo'
+
+            period_series, period_label = _build_period(df_work)
+            df_work['__period'] = period_series
+            
             # 1) Cliente específico (ex.: ACCUMED 2024)
-            if any(word in query_lower for word in ['cliente', 'consignatario', 'accumed']) and client_col and qty_col:
-                df_client = df
-                if 'accumed' in query_lower:
-                    df_client = df_client[df_client[client_col].astype(str).str.contains('ACCUMED', case=False, na=False)]
+            if any(word in q_norm for word in ['cliente', 'consignatario', 'consignatário', 'accumed']) and client_cols and qty_col:
+                df_client = df_work
+                # Filtro por ACCUMED em QUALQUER coluna candidata de cliente
+                if 'accumed' in q_norm:
+                    mask_any = None
+                    for col in client_cols:
+                        try:
+                            s = df_client[col].astype(str).apply(_norm)
+                            m = s.str.contains('accumed', na=False)
+                            mask_any = m if mask_any is None else (mask_any | m)
+                        except Exception:
+                            continue
+                    if mask_any is not None:
+                        df_client = df_client[mask_any]
                 # Filtrar por ano presente na query
-                for year in ['2024', '2025']:
-                    if year in query_lower and date_cols:
-                        df_client = filter_year(df_client, int(year))
+                year_selected = None
+                for y in ['2025', '2024', '2023']:
+                    if y in q_norm:
+                        df_client = filter_year(df_client, int(y))
+                        year_selected = y
                         break
                 total = pd.to_numeric(df_client[qty_col], errors='coerce').sum()
-                insights.append(f"Cliente '{client_col}': {total:,.0f} {qty_col}")
-                if date_cols and not df_client.empty:
-                    by_period = df_client.groupby(date_col)[qty_col].sum().sort_index()
-                    insights.append(f"Distribuição por {date_col}: {dict(by_period.tail(6))}")
+                entity_label = 'ACCUMED' if 'accumed' in q_norm else 'Cliente'
+                if year_selected:
+                    insights.append(f"{entity_label} {year_selected}: {total:,.0f} {unit_label}")
+                else:
+                    insights.append(f"{entity_label}: {total:,.0f} {unit_label}")
+                if not df_client.empty and '__period' in df_client.columns or '__period' in df_work.columns:
+                    # garantir coluna de período no recorte
+                    if '__period' not in df_client.columns:
+                        df_client = df_client.copy()
+                        df_client['__period'] = df_work.loc[df_client.index, '__period']
+                    by_period = df_client.groupby('__period')[qty_col].sum().sort_index()
+                    insights.append(f"Distribuição por período: {_pyint_dict(by_period, n=6)}")
             
             # 2) Temporal específico (Março 2025, 2024 vs 2025)
-            if any(word in query_lower for word in ['março', 'marco', 'march', '2025', '2024']) and qty_col:
+            if any(word in q_norm for word in ['março', 'marco', 'march', '2025', '2024']) and qty_col:
+                # Aplicar filtro I/E se solicitado na pergunta
+                df_temporal = df_work
+                # Se a pergunta mencionar Santos/porto, restringir a Santos aqui também
+                if any(w in q_norm for w in ['santos', 'porto', 'port']):
+                    df_temporal = filter_port_santos(df_temporal)
+                if any(w in q_norm for w in ['exporta', 'exportação', 'exportacao']):
+                    df_temporal = filter_ie(df_temporal, 'exportacao')
+                if any(w in q_norm for w in ['importa', 'importação', 'importacao']):
+                    df_temporal = filter_ie(df_temporal, 'importacao')
+
                 # Março de 2025
-                if any(w in query_lower for w in ['março', 'marco', 'march']):
-                    df_march = filter_month_year(df, 3, 2025) if date_cols else df.iloc[0:0]
+                if any(w in q_norm for w in ['março', 'marco', 'march']):
+                    df_march = filter_month_year(df_temporal, 3, 2025) if date_cols else df.iloc[0:0]
                     total = pd.to_numeric(df_march[qty_col], errors='coerce').sum()
-                    insights.append(f"Março/2025: {total:,.0f} {qty_col}")
+                    op_str = ' (importações)' if any(w in q_norm for w in ['importa', 'importação', 'importacao']) else (' (exportações)' if any(w in q_norm for w in ['exporta', 'exportação', 'exportacao']) else '')
+                    insights.append(f"Março/2025{op_str}: {total:,.0f} {unit_label}")
+                
                 # Totais por ano
-                if '2025' in query_lower and date_cols:
-                    df_2025 = filter_year(df, 2025)
+                if '2025' in q_norm and date_cols:
+                    df_2025 = filter_year(df_temporal, 2025)
                     total_2025 = pd.to_numeric(df_2025[qty_col], errors='coerce').sum()
-                    insights.append(f"2025: {total_2025:,.0f} {qty_col}")
-                if '2024' in query_lower and date_cols:
-                    df_2024 = filter_year(df, 2024)
+                    insights.append(f"2025: {total_2025:,.0f} {unit_label}")
+                if '2024' in q_norm and date_cols:
+                    df_2024 = filter_year(df_temporal, 2024)
                     total_2024 = pd.to_numeric(df_2024[qty_col], errors='coerce').sum()
-                    insights.append(f"2024: {total_2024:,.0f} {qty_col}")
+                    insights.append(f"2024: {total_2024:,.0f} {unit_label}")
             
             # 3) Porto de Santos e ranking de armadores
-            if any(word in query_lower for word in ['porto', 'santos', 'port']) and qty_col:
-                df_santos = filter_port_santos(df)
+            if any(word in q_norm for word in ['porto', 'santos', 'port']) and qty_col:
+                df_santos = filter_port_santos(df_work)
                 if not df_santos.empty:
                     total_santos = pd.to_numeric(df_santos[qty_col], errors='coerce').sum()
-                    insights.append(f"Porto de Santos (todas as datas): {total_santos:,.0f} {qty_col}")
-                    # Filtrar por ano da query (ex.: 2024)
-                    if '2024' in query_lower and date_cols:
-                        df_santos = filter_year(df_santos, 2024)
-                    if '2025' in query_lower and date_cols:
-                        df_santos = filter_year(df_santos, 2025)
+                    insights.append(f"Porto de Santos (todas as datas): {total_santos:,.0f} {unit_label}")
+                    # Filtrar por ano da query (ex.: 2024) e reportar explicitamente o total do ano
+                    if '2024' in q_norm and date_cols:
+                        df_santos_y = filter_year(df_santos, 2024)
+                        total_santos_y = pd.to_numeric(df_santos_y[qty_col], errors='coerce').sum()
+                        insights.append(f"Santos 2024: {total_santos_y:,.0f} {unit_label}")
+                        df_santos = df_santos_y
+                    if '2025' in q_norm and date_cols:
+                        df_santos_y = filter_year(df_santos, 2025)
+                        total_santos_y = pd.to_numeric(df_santos_y[qty_col], errors='coerce').sum()
+                        insights.append(f"Santos 2025: {total_santos_y:,.0f} {unit_label}")
+                        df_santos = df_santos_y
                     if armador_col and not df_santos.empty:
-                        top_arm = df_santos.groupby(armador_col)[qty_col].sum().sort_values(ascending=False).head(5)
-                        insights.append(f"Top armadores em Santos: {dict(top_arm)}")
+                        top_arm = df_santos.groupby(armador_col)[qty_col].sum().fillna(0).sort_values(ascending=False).head(5)
+                        # Converter para inteiros simples
+                        top_arm = {str(k): int(v) for k, v in top_arm.items()}
+                        insights.append(f"Top armadores em Santos: {top_arm}")
                 else:
                     insights.append("Não encontrei registros do Porto de Santos nas colunas de porto detectadas.")
             
@@ -638,19 +860,32 @@ class AdvancedLLMManager:
                 feb_total = pd.to_numeric(df_feb[qty_col], errors='coerce').sum()
                 diff = feb_total - jan_total
                 pct_change = (diff / jan_total * 100) if jan_total else 0
-                insights.append(f"Janeiro/2025: {jan_total:,.0f} {qty_col}")
-                insights.append(f"Fevereiro/2025: {feb_total:,.0f} {qty_col}")
+                insights.append(f"Janeiro/2025: {jan_total:,.0f} {unit_label}")
+                insights.append(f"Fevereiro/2025: {feb_total:,.0f} {unit_label}")
                 insights.append(f"Variação: {diff:+,.0f} ({pct_change:+.1f}%)")
+                # Tabela em HTML (renderiza dentro do container HTML do chat)
+                html_table = (
+                    "<table style='width:100%; border-collapse:collapse;'>"
+                    "<thead><tr>"
+                    "<th style='text-align:left; border-bottom:1px solid #ddd;'>Período</th>"
+                    "<th style='text-align:right; border-bottom:1px solid #ddd;'>Quantidade</th>"
+                    "</tr></thead><tbody>"
+                    f"<tr><td>Jan/2025</td><td style='text-align:right;'>{jan_total:,.0f} {unit_label}</td></tr>"
+                    f"<tr><td>Fev/2025</td><td style='text-align:right;'>{feb_total:,.0f} {unit_label}</td></tr>"
+                    f"<tr><td><b>Variação</b></td><td style='text-align:right;'><b>{diff:+,.0f} ({pct_change:+.1f}%)</b></td></tr>"
+                    "</tbody></table>"
+                )
+                insights.append(html_table)
             
             # 5) Tendência últimos 3 meses
-            if any(word in query_lower for word in ['tendencia', 'tendência', 'trend', 'ultimos', 'últimos', 'meses']) and qty_col and date_cols:
+            if any(word in q_norm for word in ['tendencia', 'tendência', 'trend', 'ultimos', 'últimos', 'meses']) and qty_col and date_cols:
                 # Tentar ordenar por uma coluna de período
-                series = df.groupby(date_col)[qty_col].sum().sort_index()
+                series = df_work.groupby('__period')[qty_col].sum().sort_index()
                 last3 = series.tail(3)
                 if len(last3) >= 2:
-                    insights.append(f"Últimos 3 períodos ({date_col}): {dict(last3)}")
+                    insights.append(f"Últimos 3 períodos: {_pyint_dict(last3, n=3)}")
                     trend = last3.iloc[-1] - last3.iloc[0]
-                    insights.append(f"Tendência geral: {trend:+,.0f} {qty_col}")
+                    insights.append(f"Tendência geral: {trend:+,.0f} {unit_label}")
             
             return "\n".join(insights) if insights else "Análise específica não disponível para esta consulta"
         

@@ -1,0 +1,46 @@
+{
+  "id": "20250908_214757",
+  "created_at": "2025-09-08T21:50:05.400252",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Quantos containers foram movimentados pelo consignatário ACCUMED PRODUTOS MEDICO HOSPITALARES LTDA em 2024?"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\nCliente 'Cliente': 0 Qtde\n2024: 0 Qtde\n\nFonte: dados consolidados (10,713 registros)."
+    },
+    {
+      "role": "user",
+      "content": "Qual foi o volume total de importações em março de 2025, considerando todos os portos?"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\nMarço/2025 (importações): 680 Qtde\n2025: 2,920 Qtde\nPorto de Santos (todas as datas): 32 Qtde\nTop armadores em Santos: {'MAERSK LINE': np.float64(32.0), 'MSC': np.float64(0.0)}\n\nFonte: dados consolidados (10,713 registros)."
+    },
+    {
+      "role": "user",
+      "content": "Quais são os principais armadores que operaram no porto de Santos em 2024, ordenados por quantidade de containers?"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\n2024: 0 Qtde\nPorto de Santos (todas as datas): 32 Qtde\n\nFonte: dados consolidados (10,713 registros)."
+    },
+    {
+      "role": "user",
+      "content": "Compare o volume de exportações entre janeiro e fevereiro de 2025"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\n2025: 17,996 Qtde\nPorto de Santos (todas as datas): 32 Qtde\nTop armadores em Santos: {'MAERSK LINE': np.float64(32.0), 'MSC': np.float64(0.0)}\nJaneiro/2025: 1,034 Qtde\nFevereiro/2025: 2,852 Qtde\nVariação: +1,818 (+175.8%)\n\nFonte: dados consolidados (10,713 registros)."
+    },
+    {
+      "role": "user",
+      "content": "Mostre uma análise de tendência do volume de containers movimentados nos últimos 3 meses"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\nÚltimos 3 períodos (Data para pagamento com desconto): {'29/10/2024': np.float64(0.0), '30/04/2024': np.float64(0.0), '31/05/2024': np.float64(0.0)}\nTendência geral: +0 Qtde\n\nFonte: dados consolidados (10,713 registros)."
+    }
+  ]
+}

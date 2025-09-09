@@ -1,0 +1,30 @@
+{
+  "id": "20250908_215838",
+  "created_at": "2025-09-08T21:59:53.877553",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Mostre uma análise de tendência do volume de containers movimentados nos últimos 3 meses"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\nÚltimos 3 períodos (Data Mov): {'31/03/2025': 0, '31/05/2025': 0, '31/07/2025': 0}\nTendência geral: +0 Data para pagamento com desconto\n\nFonte: dados consolidados (10,713 registros)."
+    },
+    {
+      "role": "user",
+      "content": "Compare o volume de exportações entre janeiro e fevereiro de 2025"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\n2025: 0 Data para pagamento com desconto\nPorto de Santos (todas as datas): 0 Data para pagamento com desconto\nTop armadores em Santos: {'MAERSK LINE': 0, 'MSC': 0}\nJaneiro/2025: 0 Data para pagamento com desconto\nFevereiro/2025: 0 Data para pagamento com desconto\nVariação: +0 (+0.0%)\n\nFonte: dados consolidados (10,713 registros)."
+    },
+    {
+      "role": "user",
+      "content": "Quais são os principais armadores que operaram no porto de Santos em 2024, ordenados por quantidade de containers?"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\n2024: 4,851,924,348 Data para pagamento com desconto\nPorto de Santos (todas as datas): 0 Data para pagamento com desconto\n\nFonte: dados consolidados (10,713 registros)."
+    }
+  ]
+}

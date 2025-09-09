@@ -233,6 +233,14 @@ def render_sidebar():
         
         # Seção de upload de dados
         st.markdown("### 📊 Alimentar Dados")
+        # Utilitários de manutenção
+        with st.expander("🧰 Manutenção", expanded=False):
+            if st.button("🧹 Resetar Base de Conhecimento", use_container_width=True, help="Limpa índice vetorial e documentos persistidos"):
+                try:
+                    st.session_state.llm_manager.reset_knowledge_base()
+                    st.success("Base de conhecimento resetada. Recarregue os dados (upload/links) para reindexar.")
+                except Exception as e:
+                    st.error(f"Erro ao resetar base: {e}")
         
         # Auto-sync automático (sem controles manuais)
         if 'auto_sync_manager' not in st.session_state:
@@ -564,104 +572,149 @@ def render_chat():
                 # Verificar se OpenAI API key está configurada
                 openai_key = os.getenv('OPENAI_API_KEY')
                 if not openai_key or openai_key == 'sk-sua-chave-openai-aqui':
-                    response = """
-🔑 **Chave OpenAI não configurada!**
+                    # Modo direto: sem LLM, mas com análise dos dados consolidados
+                    combined_df = None
+                    dados_dir = Path("dados/processed")
 
-Para usar o chat, você precisa:
+                    dataframes = []
+                    file_info = []
 
-1. **Obter uma chave da OpenAI:**
-   - Acesse: https://platform.openai.com/api-keys
-   - Crie uma conta e gere sua API key
+                    if dados_dir.exists():
+                        excel_files = list(dados_dir.glob("*.xlsx"))
+                        csv_files = list(dados_dir.glob("*.csv"))
+                        all_files = excel_files + csv_files
+                        for file_path in all_files:
+                            try:
+                                if file_path.suffix.lower() == ".csv":
+                                    df_temp = pd.read_csv(file_path)
+                                else:
+                                    df_temp = pd.read_excel(file_path)
+                                if not df_temp.empty:
+                                    df_temp['arquivo_origem'] = file_path.name
+                                    dataframes.append(df_temp)
+                                    file_info.append(f"{file_path.name}: {len(df_temp):,} registros")
+                            except Exception as e:
+                                st.error(f"Erro ao carregar {file_path.name}: {e}")
 
-2. **Configurar no arquivo .env:**
-   - Abra o arquivo `.env` na raiz do projeto
-   - Substitua `sk-sua-chave-openai-aqui` pela sua chave real
-   - Exemplo: `OPENAI_API_KEY=sk-proj-abc123...`
+                    if dataframes:
+                        combined_df = pd.concat(dataframes, ignore_index=True, sort=False)
 
-3. **Reinicie o aplicativo**
-
-Sem a chave da OpenAI, não posso processar suas perguntas.
-                    """
+                    if combined_df is not None and not combined_df.empty:
+                        # Produzir resposta direta sem LLM
+                        direct = st.session_state.llm_manager._analyze_specific_query(user_input, combined_df)
+                        if direct and "Análise específica não disponível" not in direct:
+                            response = (
+                                "RESPOSTA DIRETA (modo sem LLM)\n"
+                                f"{direct}\n\n"
+                                f"Fonte: dados consolidados ({len(combined_df):,} registros).\n"
+                                "Para respostas elaboradas em linguagem natural, configure sua OPENAI_API_KEY no arquivo .env."
+                            )
+                        else:
+                            response = (
+                                "🔑 **Chave OpenAI não configurada** e a pergunta requer geração de linguagem natural.\n\n"
+                                "Tente reformular pedindo um número/agrupamento específico (ex.: 'quantos containers...'),\n"
+                                "ou configure sua chave em `.env` (OPENAI_API_KEY=...)."
+                            )
+                    else:
+                        response = (
+                            "🔑 **Chave OpenAI não configurada** e **sem dados consolidados** encontrados em `dados/processed/`.\n\n"
+                            "Faça upload de planilhas ou informe links na barra lateral, ou configure sua OPENAI_API_KEY."
+                        )
                 else:
                     # Carregar TODOS os dados processados e consolidar
                     combined_df = None
                     dados_dir = Path("dados/processed")
-                    
+
+                    dataframes = []
+                    file_info = []
+
                     if dados_dir.exists():
+                        # Considera tanto Excel quanto CSV
                         excel_files = list(dados_dir.glob("*.xlsx"))
-                        if excel_files:
-                            dataframes = []
-                            file_info = []
-                            
-                            for file_path in excel_files:
-                                try:
+                        csv_files = list(dados_dir.glob("*.csv"))
+                        all_files = excel_files + csv_files
+
+                        for file_path in all_files:
+                            try:
+                                if file_path.suffix.lower() == ".csv":
+                                    df_temp = pd.read_csv(file_path)
+                                else:
                                     df_temp = pd.read_excel(file_path)
-                                    if not df_temp.empty:
-                                        # Adicionar coluna de origem
-                                        df_temp['arquivo_origem'] = file_path.name
-                                        dataframes.append(df_temp)
-                                        file_info.append(f"{file_path.name}: {len(df_temp):,} registros")
-                                except Exception as e:
-                                    st.error(f"Erro ao carregar {file_path.name}: {e}")
-                            
-                            if dataframes:
-                                # Consolidar todos os DataFrames
-                                combined_df = pd.concat(dataframes, ignore_index=True, sort=False)
-                                
-                                # Mostrar informações consolidadas - SEMPRE visível
-                                with st.expander("📊 Dados Consolidados - CLIQUE AQUI", expanded=True):
-                                    st.success(f"✅ **{len(dataframes)} arquivos consolidados com {len(combined_df):,} registros totais**")
-                                    
-                                    st.write("**📁 Arquivos processados:**")
-                                    for info in file_info:
-                                        st.write(f"  • {info}")
-                                    
-                                    st.write(f"**📋 Colunas disponíveis:** {', '.join(combined_df.columns[:10])}{'...' if len(combined_df.columns) > 10 else ''}")
-                                    
-                                    # Verificar dados ACCUMED sempre (detecção robusta/acento-insensível)
-                                    def _norm(s):
+
+                                if not df_temp.empty:
+                                    # Adicionar coluna de origem
+                                    df_temp['arquivo_origem'] = file_path.name
+                                    dataframes.append(df_temp)
+                                    file_info.append(f"{file_path.name}: {len(df_temp):,} registros")
+                                else:
+                                    file_info.append(f"{file_path.name}: 0 registros (vazio)")
+                            except Exception as e:
+                                st.error(f"Erro ao carregar {file_path.name}: {e}")
+
+                    # Consolidar se houver ao menos um DataFrame não vazio
+                    if dataframes:
+                        combined_df = pd.concat(dataframes, ignore_index=True, sort=False)
+
+                    # Mostrar informações consolidadas - SEMPRE visível
+                    with st.expander("📊 Dados Consolidados - CLIQUE AQUI", expanded=True):
+                        total_regs = len(combined_df) if combined_df is not None else 0
+                        st.info(f"Arquivos na pasta dados/processed/: {len(file_info)} | Registros totais consolidados: {total_regs:,}")
+
+                        if file_info:
+                            st.write("**📁 Arquivos processados:**")
+                            for info in file_info:
+                                st.write(f"  • {info}")
+                        else:
+                            st.warning("Nenhum arquivo encontrado em dados/processed/. Faça upload ou informe links na barra lateral.")
+
+                        if combined_df is not None and not combined_df.empty:
+                            st.success(f"✅ **{len(dataframes)} arquivos consolidados com {len(combined_df):,} registros totais**")
+                            st.write(f"**📋 Colunas disponíveis:** {', '.join(combined_df.columns[:10])}{'...' if len(combined_df.columns) > 10 else ''}")
+
+                            # Verificar dados ACCUMED sempre (detecção robusta/acento-insensível)
+                            def _norm(s):
+                                try:
+                                    s = str(s).lower()
+                                except Exception:
+                                    return ""
+                                table = str.maketrans(
+                                    "áàãâäéêëèíïîìóõôöòúüûùç",
+                                    "aaaaaeeeeiiiiooooouuuuc"
+                                )
+                                return s.translate(table)
+
+                            candidate_keys = ['cliente', 'consignatario', 'consignatário', 'importador', 'exportador']
+                            accumed_cols = [col for col in combined_df.columns if any(k in _norm(col) for k in candidate_keys)]
+
+                            if accumed_cols:
+                                col_cli = accumed_cols[0]
+                                try:
+                                    series_cli = combined_df[col_cli].astype(str)
+                                    accumed_mask = series_cli.str.contains('ACCUMED', case=False, na=False)
+                                    accumed_data = combined_df[accumed_mask]
+                                except Exception:
+                                    accumed_data = combined_df.iloc[0:0]
+
+                                if len(accumed_data) > 0:
+                                    st.write(f"🎯 **Registros ACCUMED encontrados:** {len(accumed_data)}")
+                                    # Mostrar distribuição por arquivo
+                                    accumed_by_file = accumed_data['arquivo_origem'].value_counts()
+                                    st.write("**📊 Distribuição ACCUMED por arquivo:**")
+                                    for arquivo, count in accumed_by_file.items():
+                                        st.write(f"  • {arquivo}: {count} registros")
+
+                                    # Mostrar anos disponíveis
+                                    anos_cols = [col for col in combined_df.columns if any(k in _norm(col) for k in ['ano', 'data'])]
+                                    if anos_cols:
                                         try:
-                                            s = str(s).lower()
+                                            anos_unicos = accumed_data[anos_cols[0]].astype(str).str[:4].unique()
+                                            st.write(f"**📅 Anos com dados ACCUMED:** {', '.join(sorted(map(str, anos_unicos)))}")
                                         except Exception:
-                                            return ""
-                                        table = str.maketrans(
-                                            "áàãâäéêëèíïîìóõôöòúüûùç",
-                                            "aaaaaeeeeiiiiooooouuuuc"
-                                        )
-                                        return s.translate(table)
-                                    
-                                    candidate_keys = ['cliente', 'consignatario', 'consignatário', 'importador', 'exportador']
-                                    accumed_cols = [col for col in combined_df.columns if any(k in _norm(col) for k in candidate_keys)]
-                                    
-                                    if accumed_cols:
-                                        col_cli = accumed_cols[0]
-                                        try:
-                                            series_cli = combined_df[col_cli].astype(str)
-                                            accumed_mask = series_cli.str.contains('ACCUMED', case=False, na=False)
-                                            accumed_data = combined_df[accumed_mask]
-                                        except Exception:
-                                            accumed_data = combined_df.iloc[0:0]
-                                        
-                                        if len(accumed_data) > 0:
-                                            st.write(f"🎯 **Registros ACCUMED encontrados:** {len(accumed_data)}")
-                                            # Mostrar distribuição por arquivo
-                                            accumed_by_file = accumed_data['arquivo_origem'].value_counts()
-                                            st.write("**📊 Distribuição ACCUMED por arquivo:**")
-                                            for arquivo, count in accumed_by_file.items():
-                                                st.write(f"  • {arquivo}: {count} registros")
-                                            
-                                            # Mostrar anos disponíveis
-                                            anos_cols = [col for col in combined_df.columns if any(k in _norm(col) for k in ['ano', 'data'])]
-                                            if anos_cols:
-                                                try:
-                                                    anos_unicos = accumed_data[anos_cols[0]].astype(str).str[:4].unique()
-                                                    st.write(f"**📅 Anos com dados ACCUMED:** {', '.join(sorted(map(str, anos_unicos)))}")
-                                                except Exception:
-                                                    pass
-                                        else:
-                                            st.warning("⚠️ Nenhum registro ACCUMED encontrado nos dados consolidados")
-                                    else:
-                                        st.warning("⚠️ Nenhuma coluna de cliente/consignatário encontrada")
+                                            pass
+                                else:
+                                    st.warning("⚠️ Nenhum registro ACCUMED encontrado nos dados consolidados")
+                            else:
+                                st.warning("⚠️ Nenhuma coluna de cliente/consignatário encontrada")
                     
                     # Usar o método aprimorado com dados consolidados
                     if combined_df is not None and not combined_df.empty:
