@@ -500,6 +500,9 @@ class AdvancedLLMManager:
             
             # Query normalizada para matching robusto
             q_norm = _norm(query)
+            # Flags de intenção para evitar análises conflitantes
+            is_compare = (('compar' in q_norm or 'compare' in q_norm) or (('janeiro' in q_norm or 'jan/' in q_norm or 'jan ' in q_norm) and ('fevereiro' in q_norm or 'fev/' in q_norm or 'fev ' in q_norm)))
+            is_port_query = ('porto' in q_norm) or ('santos' in q_norm)
             
             # Trabalhar em uma cópia e garantir numérico na coluna de quantidade quando identificada
             df_work = df.copy()
@@ -792,11 +795,11 @@ class AdvancedLLMManager:
                     insights.append(f"Distribuição por período: {_pyint_dict(by_period, n=6)}")
             
             # 2) Temporal específico (Março 2025, 2024 vs 2025)
-            if any(word in q_norm for word in ['março', 'marco', 'march', '2025', '2024']) and qty_col:
+            if any(word in q_norm for word in ['março', 'marco', 'march', '2025', '2024']) and qty_col and not is_compare:
                 # Aplicar filtro I/E se solicitado na pergunta
                 df_temporal = df_work
                 # Se a pergunta mencionar Santos/porto, restringir a Santos aqui também
-                if any(w in q_norm for w in ['santos', 'porto', 'port']):
+                if is_port_query:
                     df_temporal = filter_port_santos(df_temporal)
                 if any(w in q_norm for w in ['exporta', 'exportação', 'exportacao']):
                     df_temporal = filter_ie(df_temporal, 'exportacao')
@@ -821,7 +824,7 @@ class AdvancedLLMManager:
                     insights.append(f"2024: {total_2024:,.0f} {unit_label}")
             
             # 3) Porto de Santos e ranking de armadores
-            if any(word in q_norm for word in ['porto', 'santos', 'port']) and qty_col:
+            if is_port_query and qty_col:
                 df_santos = filter_port_santos(df_work)
                 if not df_santos.empty:
                     total_santos = pd.to_numeric(df_santos[qty_col], errors='coerce').sum()

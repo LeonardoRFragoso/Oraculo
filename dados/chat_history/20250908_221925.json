@@ -1,0 +1,14 @@
+{
+  "id": "20250908_221925",
+  "created_at": "2025-09-08T22:19:59.274119",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Compare o volume de exportações entre janeiro e fevereiro de 2025"
+    },
+    {
+      "role": "assistant",
+      "content": "RESPOSTA DIRETA\n2025: 0 containers\nPorto de Santos (todas as datas): 32 containers\nSantos 2025: 32 containers\nTop armadores em Santos: {'MAERSK LINE': 32, 'MSC': 0}\nJaneiro/2025: 1,034 containers\nFevereiro/2025: 2,852 containers\nVariação: +1,818 (+175.8%)\n<table style='width:100%; border-collapse:collapse;'><thead><tr><th style='text-align:left; border-bottom:1px solid #ddd;'>Período</th><th style='text-align:right; border-bottom:1px solid #ddd;'>Quantidade</th></tr></thead><tbody><tr><td>Jan/2025</td><td style='text-align:right;'>1,034 containers</td></tr><tr><td>Fev/2025</td><td style='text-align:right;'>2,852 containers</td></tr><tr><td><b>Variação</b></td><td style='text-align:right;'><b>+1,818 (+175.8%)</b></td></tr></tbody></table>\n\nFonte: dados consolidados (10,713 registros)."
+    }
+  ]
+}
