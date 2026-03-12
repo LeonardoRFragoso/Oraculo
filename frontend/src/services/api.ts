@@ -33,7 +33,7 @@ export async function sendMessage(query: string, conversationId?: string): Promi
   }
 }
 
-export async function uploadFile(file: File): Promise<{ success: boolean; message: string }> {
+export async function uploadFile(file: File): Promise<{ success: boolean; message: string; file_id: string; filename: string }> {
   try {
     const formData = new FormData()
     formData.append('file', file)

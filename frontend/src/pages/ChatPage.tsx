@@ -5,6 +5,7 @@ import ChatMessage from '../components/ChatMessage'
 import TypingIndicator from '../components/TypingIndicator'
 import WelcomeMessage from '../components/WelcomeMessage'
 import QuickActions from '../components/QuickActions'
+import AttachedFiles from '../components/AttachedFiles'
 import { sendMessage } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -116,6 +117,7 @@ export default function ChatPage() {
       {/* Input Area */}
       <div className="border-t border-light-border dark:border-dark-border bg-white dark:bg-dark-surface">
         <div className="max-w-4xl mx-auto p-4">
+          <AttachedFiles />
           <form onSubmit={handleSubmit} className="relative">
             <textarea
               ref={inputRef}

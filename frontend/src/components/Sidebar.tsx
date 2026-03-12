@@ -34,7 +34,21 @@ export default function Sidebar() {
 
     setIsUploading(true)
     try {
-      await uploadFile(file)
+      const response = await uploadFile(file)
+      
+      // Salvar arquivo na lista de anexados
+      const attachedFiles = JSON.parse(localStorage.getItem('attached_files') || '[]')
+      attachedFiles.push({
+        filename: file.name,
+        file_id: response.file_id,
+        uploaded_at: new Date().toISOString(),
+        size: file.size
+      })
+      localStorage.setItem('attached_files', JSON.stringify(attachedFiles))
+      
+      // Disparar evento para atualizar componente
+      window.dispatchEvent(new Event('files-updated'))
+      
       toast.success(`Arquivo "${file.name}" processado e indexado com sucesso! Agora você pode fazer perguntas sobre ele.`)
       setShowUpload(false)
     } catch (error) {
