@@ -5,7 +5,14 @@ Script para iniciar a API FastAPI
 
 import uvicorn
 import sys
+import logging
 from pathlib import Path
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:     %(name)s - %(message)s'
+)
 
 # Adicionar diretório da API ao path
 api_dir = Path(__file__).parent / "api"
