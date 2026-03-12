@@ -78,19 +78,38 @@ async def upload_file(
         # Processar arquivo e extrair conteúdo
         processed = False
         extracted_content = None
+        chunks_indexed = 0
         
         try:
             result = file_processor.process_file(str(file_path))
             processed = result['success']
             extracted_content = result['content']
             logger.info(f"Arquivo processado: {file.filename} ({result['char_count']} caracteres)")
+            
+            # Indexar no RAG se conteúdo foi extraído com sucesso
+            if extracted_content and len(extracted_content) > 0:
+                try:
+                    from ..rag_service import RAGService
+                    rag = RAGService()
+                    chunks_indexed = rag.add_document(
+                        content=extracted_content,
+                        metadata={
+                            'filename': file.filename,
+                            'file_id': file_id,
+                            'type': result.get('type', 'unknown'),
+                            'uploaded_at': datetime.now().isoformat()
+                        }
+                    )
+                    logger.info(f"✓ Arquivo indexado no RAG: {chunks_indexed} chunks")
+                except Exception as e:
+                    logger.error(f"Erro ao indexar no RAG: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Erro ao processar arquivo: {e}")
             extracted_content = f"Erro ao processar: {str(e)}"
         
         return FileUploadResponse(
             success=True,
-            message=f"Arquivo enviado e processado com sucesso. {len(extracted_content) if extracted_content else 0} caracteres extraídos.",
+            message=f"Arquivo processado com sucesso! {result.get('char_count', 0)} caracteres extraídos e {chunks_indexed} chunks indexados. Agora você pode fazer perguntas sobre o conteúdo.",
             file_id=file_id,
             filename=file.filename,
             size=file_size,
