@@ -1,0 +1,52 @@
+# ============================================
+# Oráculo API - Dependências Mínimas
+# ============================================
+
+# FastAPI e servidor
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Validação de dados
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# HTTP client
+httpx==0.26.0
+
+# Autenticação JWT
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Validação de email
+email-validator==2.1.0
+
+# Variáveis de ambiente
+python-dotenv==1.0.0
+
+# Autenticação
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0
+bcrypt>=4.0.0
+
+# OpenAI
+openai>=1.0.0
+
+# Processamento de arquivos
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+openpyxl>=3.0.0
+pandas>=2.0.0
+
+# RAG e embeddings
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+numpy>=1.24.0
+
+# Processamento de dados (já instalado)
+# pandas>=2.0.0
+# openpyxl>=3.0.0
+
+# ML/Embeddings (já instalado)
+# sentence-transformers>=2.2.0
+# faiss-cpu>=1.7.0

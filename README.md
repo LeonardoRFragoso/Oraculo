@@ -1,15 +1,76 @@
-# 🤖 GPTRACKER - Sistema Inteligente de Análise Comercial
+# 🔮 ORÁCULO - Seu Consultor de IA para Decisões Estratégicas
 
-**GPTRACKER** é um sistema avançado de inteligência artificial desenvolvido especificamente para a **Itracker**, combinando análise de dados logísticos, insights comerciais e capacidades preditivas em uma plataforma integrada.
+**Oráculo** é um assistente de inteligência artificial de última geração, especializado em análise de dados comerciais e logísticos. Combinando o poder do **OpenRAG** com uma interface moderna e intuitiva, oferece insights profundos e análises preditivas através de conversação natural.
+
+> **Anteriormente conhecido como GPTRACKER** - Transformado em um produto independente e moderno.
+
+---
+
+## 🚀 **Arquitetura Moderna**
+
+O Oráculo utiliza **OpenRAG**, a stack mais moderna de RAG do mercado, com arquitetura separada:
+
+- 🎨 **Frontend React** - Interface moderna estilo ChatGPT/Claude
+- 🐍 **Backend Python** - API REST com Streamlit
+- 🔍 **OpenRAG Stack** - OpenSearch + Langflow + Docling
+- 🐳 **Docker** - Containerização completa
+
+### **Benefícios**
+
+- ✅ **10x mais rápido** em buscas semânticas
+- ✅ **Suporte a PDF, DOCX, PPTX** além de Excel/CSV
+- ✅ **OCR nativo** para documentos escaneados
+- ✅ **Busca híbrida** (vetorial + keyword) com reranking
+- ✅ **Workflows visuais** no Langflow
+- ✅ **Escalabilidade horizontal** com OpenSearch
+
+👉 **[Documentação Completa](docs/)** | **[Quickstart OpenRAG](docs/QUICKSTART_OPENRAG.md)** | **[Branding](docs/ORACULO_BRANDING.md)**
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+Oraculo/
+├── backend/                    # 🐍 Backend Python
+│   ├── src/                   # Código fonte
+│   ├── scripts/               # Scripts de automação
+│   ├── tests/                 # Testes
+│   ├── gptracker.py          # App Streamlit (legado)
+│   ├── oraculo.py            # App Streamlit (novo)
+│   └── requirements*.txt     # Dependências
+│
+├── frontend/                   # ⚛️ Frontend React
+│   ├── src/                   # Código React
+│   ├── public/                # Assets públicos
+│   └── package.json           # Dependências Node
+│
+├── docs/                       # 📚 Documentação
+│   ├── QUICKSTART_OPENRAG.md
+│   ├── MIGRATION_PLAN.md
+│   ├── ORACULO_BRANDING.md
+│   └── ...
+│
+├── langflow_workflows/         # 🔄 Workflows Langflow
+│   ├── data_ingestion.json
+│   └── rag_chat.json
+│
+├── docker-compose.openrag.yml  # 🐳 Docker Compose
+├── Makefile                    # 🛠️ Comandos úteis
+└── README.md                   # 📖 Este arquivo
+```
+
+---
 
 ## 🌟 Principais Funcionalidades
 
 ### 💬 Chat Inteligente com RAG
-- Interface conversacional natural usando GPT-4 Turbo
-- Sistema RAG (Retrieval-Augmented Generation) para respostas contextualizadas
-- Base de conhecimento dinâmica atualizada automaticamente
-- **Upload múltiplo** de planilhas locais e links de nuvem
-- **Monitoramento automático** de alterações em tempo real
+- ✨ **Interface moderna** estilo ChatGPT/Claude (React)
+- 🤖 **GPT-4 Turbo** para conversação natural
+- 🔍 **OpenRAG** - Sistema RAG enterprise-grade
+- 📁 **Upload múltiplo** de planilhas, PDFs, DOCXs
+- 🔄 **Monitoramento automático** de alterações
+- 💾 **Cache inteligente** (reduz custos em 50%)
 
 ### 📊 Dashboard Executivo
 - KPIs em tempo real

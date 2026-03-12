@@ -2,6 +2,8 @@
 Configurações centralizadas do sistema
 """
 
+import os
+
 # Mapeamento de categorias e palavras-chave
 CATEGORIA_MAPPING = {
     "importacao": ["importação", "importacao", "importado", "importador", "consignatário"],
@@ -132,11 +134,32 @@ CACHE_CONFIG = {
 
 # Configuração da API OpenAI
 OPENAI_CONFIG = {
-    "model": "gpt-4",
+    "model": "gpt-4-turbo",
     "temperature": 0.7,
-    "max_tokens": 500,
+    "max_tokens": 1000,
     "timeout": 30,
     "max_retries": 3
+}
+
+# Configuração OpenRAG
+OPENRAG_CONFIG = {
+    "enabled": os.getenv("USE_OPENRAG", "false").lower() == "true",
+    "api_url": os.getenv("OPENRAG_API_URL", "http://localhost:7860"),
+    "opensearch_url": os.getenv("OPENSEARCH_URL", "http://localhost:9200"),
+    "docling_url": os.getenv("DOCLING_URL", "http://localhost:5001"),
+    "redis_url": os.getenv("REDIS_URL", "redis://localhost:6379"),
+    "index_name": os.getenv("OPENRAG_INDEX_NAME", "gptracker_knowledge"),
+    "embedding_model": os.getenv("EMBEDDING_MODEL", "text-embedding-3-large"),
+    "chat_model": os.getenv("CHAT_MODEL", "gpt-4-turbo"),
+    "chunk_size": int(os.getenv("CHUNK_SIZE", "512")),
+    "chunk_overlap": int(os.getenv("CHUNK_OVERLAP", "50")),
+    "chunk_strategy": os.getenv("CHUNK_STRATEGY", "semantic"),
+    "enable_reranking": os.getenv("ENABLE_RERANKING", "true").lower() == "true",
+    "enable_hybrid_search": os.getenv("ENABLE_HYBRID_SEARCH", "true").lower() == "true",
+    "enable_cache": os.getenv("ENABLE_EMBEDDING_CACHE", "true").lower() == "true",
+    "max_search_results": int(os.getenv("MAX_SEARCH_RESULTS", "10")),
+    "temperature": float(os.getenv("CHAT_TEMPERATURE", "0.7")),
+    "max_tokens": int(os.getenv("MAX_RESPONSE_TOKENS", "1000"))
 }
 
 # Configurações para análise

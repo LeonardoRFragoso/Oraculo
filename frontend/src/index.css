@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Scrollbar customizado */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary-dark;
+  }
+}
+
+@layer components {
+  /* Animações customizadas */
+  .animate-typing {
+    animation: bounce 1.4s infinite ease-in-out;
+  }
+
+  .animate-typing:nth-child(1) {
+    animation-delay: -0.32s;
+  }
+
+  .animate-typing:nth-child(2) {
+    animation-delay: -0.16s;
+  }
+
+  /* Gradientes */
+  .gradient-primary {
+    @apply bg-gradient-to-br from-primary to-secondary;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+
+  /* Chat bubbles */
+  .chat-bubble-user {
+    @apply gradient-primary text-white rounded-[18px] rounded-br-[4px] px-5 py-4 shadow-lg;
+    animation: slideInRight 0.3s ease-out;
+  }
+
+  .chat-bubble-assistant {
+    @apply bg-white dark:bg-dark-surface text-gray-900 dark:text-gray-100 
+           rounded-[18px] rounded-bl-[4px] px-6 py-5 border border-gray-200 
+           dark:border-gray-700 shadow-md;
+    animation: slideInLeft 0.3s ease-out;
+  }
+
+  /* Botões */
+  .btn-primary {
+    @apply gradient-primary text-white font-semibold px-6 py-3 rounded-xl 
+           shadow-lg hover:shadow-glow transition-all duration-300 
+           hover:-translate-y-0.5;
+  }
+
+  .btn-secondary {
+    @apply bg-transparent border-2 border-primary text-primary font-semibold 
+           px-6 py-3 rounded-xl hover:bg-primary hover:text-white 
+           transition-all duration-300;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white dark:bg-dark-surface rounded-2xl p-6 border 
+           border-gray-200 dark:border-gray-700 shadow-md 
+           hover:shadow-xl transition-all duration-300 hover:-translate-y-1;
+  }
+
+  .insight-card {
+    @apply card border-2 border-primary animate-pulse-slow;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

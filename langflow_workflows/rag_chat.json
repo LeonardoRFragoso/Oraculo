@@ -1,0 +1,165 @@
+{
+  "name": "GPTRACKER - RAG Chat",
+  "description": "Chat conversacional com recuperação de contexto e reranking",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "chat_input",
+      "type": "ChatInput",
+      "position": {"x": 100, "y": 200},
+      "data": {
+        "component_name": "Chat Input",
+        "description": "Entrada de mensagem do usuário",
+        "config": {
+          "placeholder": "Digite sua pergunta sobre containers...",
+          "max_length": 2000
+        }
+      }
+    },
+    {
+      "id": "query_rewriter",
+      "type": "QueryRewriter",
+      "position": {"x": 300, "y": 200},
+      "data": {
+        "component_name": "Query Rewriter",
+        "description": "Reformula query para melhor recuperação",
+        "config": {
+          "model": "gpt-4-turbo",
+          "temperature": 0.3,
+          "prompt_template": "Reformule a seguinte pergunta para uma busca mais efetiva:\n\nPergunta: {query}\n\nPergunta reformulada:"
+        }
+      }
+    },
+    {
+      "id": "opensearch_retriever",
+      "type": "OpenSearchRetriever",
+      "position": {"x": 500, "y": 200},
+      "data": {
+        "component_name": "OpenSearch Retriever",
+        "description": "Busca híbrida no OpenSearch",
+        "config": {
+          "index_name": "gptracker_knowledge",
+          "host": "http://opensearch:9200",
+          "top_k": 10,
+          "search_type": "hybrid",
+          "vector_weight": 0.7,
+          "keyword_weight": 0.3,
+          "filters": {}
+        }
+      }
+    },
+    {
+      "id": "reranker",
+      "type": "CohereReranker",
+      "position": {"x": 700, "y": 200},
+      "data": {
+        "component_name": "Cohere Reranker",
+        "description": "Reordena resultados por relevância",
+        "config": {
+          "model": "rerank-english-v3.0",
+          "top_n": 5,
+          "return_documents": true
+        }
+      }
+    },
+    {
+      "id": "context_builder",
+      "type": "ContextBuilder",
+      "position": {"x": 900, "y": 200},
+      "data": {
+        "component_name": "Context Builder",
+        "description": "Constrói contexto formatado para o LLM",
+        "config": {
+          "template": "Contexto relevante:\n\n{context}\n\nPergunta: {query}\n\nResponda baseado apenas no contexto fornecido.",
+          "max_context_length": 4000,
+          "include_metadata": true
+        }
+      }
+    },
+    {
+      "id": "chat_llm",
+      "type": "ChatOpenAI",
+      "position": {"x": 1100, "y": 200},
+      "data": {
+        "component_name": "Chat LLM",
+        "description": "Gera resposta usando GPT-4 Turbo",
+        "config": {
+          "model": "gpt-4-turbo",
+          "temperature": 0.7,
+          "max_tokens": 1000,
+          "system_message": "Você é um assistente especializado em análise de dados logísticos e comerciais. Responda de forma clara, objetiva e baseada nos dados fornecidos."
+        }
+      }
+    },
+    {
+      "id": "chat_output",
+      "type": "ChatOutput",
+      "position": {"x": 1300, "y": 200},
+      "data": {
+        "component_name": "Chat Output",
+        "description": "Saída da resposta",
+        "config": {
+          "stream": true,
+          "include_sources": true
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "source": "chat_input",
+      "target": "query_rewriter",
+      "sourceHandle": "output",
+      "targetHandle": "input"
+    },
+    {
+      "id": "edge_2",
+      "source": "query_rewriter",
+      "target": "opensearch_retriever",
+      "sourceHandle": "output",
+      "targetHandle": "query"
+    },
+    {
+      "id": "edge_3",
+      "source": "opensearch_retriever",
+      "target": "reranker",
+      "sourceHandle": "output",
+      "targetHandle": "documents"
+    },
+    {
+      "id": "edge_4",
+      "source": "reranker",
+      "target": "context_builder",
+      "sourceHandle": "output",
+      "targetHandle": "documents"
+    },
+    {
+      "id": "edge_5",
+      "source": "chat_input",
+      "target": "context_builder",
+      "sourceHandle": "output",
+      "targetHandle": "query"
+    },
+    {
+      "id": "edge_6",
+      "source": "context_builder",
+      "target": "chat_llm",
+      "sourceHandle": "output",
+      "targetHandle": "input"
+    },
+    {
+      "id": "edge_7",
+      "source": "chat_llm",
+      "target": "chat_output",
+      "sourceHandle": "output",
+      "targetHandle": "input"
+    }
+  ],
+  "variables": {
+    "OPENSEARCH_URL": "http://opensearch:9200",
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    "COHERE_API_KEY": "${COHERE_API_KEY}",
+    "INDEX_NAME": "gptracker_knowledge"
+  }
+}

@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # OpenSearch - Vector Store Enterprise
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: gptracker-opensearch
+    environment:
+      - cluster.name=gptracker-cluster
+      - node.name=opensearch-node1
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD:-Admin@123456}
+      - plugins.security.ssl.http.enabled=false
+      - plugins.security.ssl.transport.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    networks:
+      - openrag-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # OpenSearch Dashboards (opcional - para visualização)
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.0
+    container_name: gptracker-opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=["http://opensearch:9200"]
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    networks:
+      - openrag-network
+    depends_on:
+      - opensearch
+
+  # Langflow - Workflow Builder
+  langflow:
+    image: langflowai/langflow:latest
+    container_name: gptracker-langflow
+    environment:
+      - LANGFLOW_DATABASE_URL=sqlite:////app/langflow/langflow.db
+      - LANGFLOW_CONFIG_DIR=/app/langflow
+      - LANGFLOW_WORKERS=4
+      - LANGFLOW_AUTO_LOGIN=false
+      - LANGFLOW_SUPERUSER=${LANGFLOW_ADMIN_USER:-admin}
+      - LANGFLOW_SUPERUSER_PASSWORD=${LANGFLOW_ADMIN_PASSWORD:-Admin@123456}
+    volumes:
+      - langflow-data:/app/langflow
+      - ./langflow_workflows:/app/workflows
+    ports:
+      - "7860:7860"
+    networks:
+      - openrag-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7860/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Docling - Document Parser (MLX para Mac, CPU para outros)
+  docling:
+    image: ds4sd/docling:latest
+    container_name: gptracker-docling
+    environment:
+      - DOCLING_PORT=5001
+      - DOCLING_WORKERS=2
+    ports:
+      - "5001:5001"
+    networks:
+      - openrag-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis - Cache para embeddings e sessões
+  redis:
+    image: redis:7-alpine
+    container_name: gptracker-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-Redis@123456}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - openrag-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # GPTRACKER API (opcional - para expor API REST)
+  gptracker-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: gptracker-api
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENRAG_API_URL=http://langflow:7860
+      - OPENSEARCH_URL=http://opensearch:9200
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-Redis@123456}@redis:6379
+      - USE_OPENRAG=true
+    volumes:
+      - ./dados:/app/dados
+      - ./src:/app/src
+    ports:
+      - "5000:5000"
+    networks:
+      - openrag-network
+    depends_on:
+      - opensearch
+      - langflow
+      - docling
+      - redis
+
+volumes:
+  opensearch-data:
+    driver: local
+  langflow-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  openrag-network:
+    driver: bridge
