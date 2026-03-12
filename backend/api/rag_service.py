@@ -183,8 +183,11 @@ class RAGService:
             Lista de documentos com scores
         """
         if not self.documents:
-            logger.warning("Índice vazio, nenhum documento para buscar")
+            logger.warning("⚠️ Índice vazio, nenhum documento para buscar")
             return []
+        
+        logger.info(f"🔍 Buscando por: '{query[:100]}...'")
+        logger.info(f"📚 Total de documentos no índice: {len(self.documents)}")
         
         # Gerar embedding da query
         query_embedding = self.embedding_model.encode([query])
@@ -194,19 +197,27 @@ class RAGService:
         k = min(top_k, len(self.documents))
         distances, indices = self.index.search(query_embedding, k)
         
+        logger.info(f"🎯 FAISS retornou {len(indices[0])} resultados")
+        
         # Formatar resultados
         results = []
         for dist, idx in zip(distances[0], indices[0]):
             if idx < len(self.documents):  # Validar índice
-                results.append({
+                result = {
                     'content': self.documents[idx],
                     'metadata': self.metadata[idx],
                     'score': float(dist),
                     'similarity': 1.0 / (1.0 + float(dist))  # Converter distância em similaridade
-                })
+                }
+                results.append(result)
+                logger.info(f"  ✓ Doc {len(results)}: score={dist:.4f}, similarity={result['similarity']:.4f}, chars={len(self.documents[idx])}")
         
-        # Filtrar por score mínimo
-        results = [r for r in results if r['score'] <= min_score or min_score == 0.0]
+        # Filtrar por score mínimo (se min_score > 0, só retorna docs com score <= min_score)
+        if min_score > 0.0:
+            results = [r for r in results if r['score'] <= min_score]
+            logger.info(f"📊 Após filtro (min_score={min_score}): {len(results)} documentos")
+        
+        logger.info(f"✓ Retornando {len(results)} documentos relevantes")
         
         return results
     

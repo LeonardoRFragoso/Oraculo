@@ -52,26 +52,37 @@ async def chat(
             rag = RAGService()
             stats = rag.get_stats()
             
+            logger.info(f"📊 RAG Stats: {stats}")
+            
             if stats['total_documents'] > 0:
                 # Usar RAG se houver documentos
-                logger.info(f"Usando RAG: {stats['total_documents']} documentos disponíveis")
+                logger.info(f"✓ Usando RAG: {stats['total_documents']} documentos disponíveis")
+                logger.info(f"📝 Query: {request.query}")
+                
                 response_text = await llm_manager.generate_with_rag(
                     query=request.query,
                     top_k=3,
                     context=request.context
                 )
                 source_docs = await llm_manager.search(request.query, top_k=3)
+                logger.info(f"🔍 Documentos encontrados na busca: {len(source_docs)}")
+                
+                if source_docs:
+                    for i, doc in enumerate(source_docs):
+                        logger.info(f"  Doc {i+1}: score={doc.get('score', 0):.4f}, similarity={doc.get('similarity', 0):.4f}")
+                        logger.info(f"  Conteúdo: {doc.get('content', '')[:100]}...")
+                
                 source_names = [doc.get('metadata', {}).get('filename', 'Documento') for doc in source_docs]
             else:
                 # Sem documentos, usar LLM simples
-                logger.info("Sem documentos indexados, usando LLM simples")
+                logger.warning("⚠️ Sem documentos indexados, usando LLM simples")
                 response_text = await llm_manager.generate_response(
                     query=request.query,
                     context=request.context
                 )
                 source_names = []
         except Exception as e:
-            logger.error(f"Erro ao usar RAG: {e}")
+            logger.error(f"✗ Erro ao usar RAG: {e}", exc_info=True)
             # Fallback para LLM simples
             response_text = await llm_manager.generate_response(
                 query=request.query,
