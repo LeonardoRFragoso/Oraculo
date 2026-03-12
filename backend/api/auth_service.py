@@ -29,8 +29,8 @@ class AuthService:
         self.algorithm = algorithm
         self.access_token_expire_minutes = access_token_expire_minutes
         
-        # Password hashing
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        # Password hashing - usando sha256_crypt para evitar limitação de 72 bytes do bcrypt
+        self.pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
         
         # Armazenamento de usuários
         self.users_file = Path(users_file)
@@ -79,16 +79,10 @@ class AuthService:
     
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verifica se a senha está correta"""
-        # Bcrypt tem limite de 72 bytes, truncar se necessário
-        if len(plain_password.encode('utf-8')) > 72:
-            plain_password = plain_password[:72]
         return self.pwd_context.verify(plain_password, hashed_password)
     
     def get_password_hash(self, password: str) -> str:
         """Gera hash da senha"""
-        # Bcrypt tem limite de 72 bytes, truncar se necessário
-        if len(password.encode('utf-8')) > 72:
-            password = password[:72]
         return self.pwd_context.hash(password)
     
     def authenticate_user(self, username: str, password: str) -> Optional[Dict[str, Any]]:

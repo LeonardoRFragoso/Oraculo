@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useChat } from '../contexts/ChatContext'
 import { useState } from 'react'
 import { uploadFile } from '../services/api'
-import { toast } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import ConversationList from './ConversationList'
 
 export default function Sidebar() {
@@ -25,6 +25,24 @@ export default function Sidebar() {
       if (confirm('Iniciar nova conversa? A conversa atual será perdida.')) {
         clearMessages()
       }
+    }
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    try {
+      await uploadFile(file)
+      toast.success(`Arquivo "${file.name}" processado e indexado com sucesso! Agora você pode fazer perguntas sobre ele.`)
+      setShowUpload(false)
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      toast.error('Erro ao processar arquivo. Tente novamente.')
+    } finally {
+      setIsUploading(false)
+      e.target.value = ''
     }
   }
 
@@ -73,10 +91,14 @@ export default function Sidebar() {
           <div className="mt-2 p-3 bg-gray-50 dark:bg-dark-bg rounded-lg">
             <input
               type="file"
-              multiple
-              accept=".xlsx,.xls,.csv,.pdf,.docx"
+              accept=".xlsx,.xls,.csv,.pdf,.docx,.txt,.json"
               className="w-full text-sm"
+              onChange={handleFileUpload}
+              disabled={isUploading}
             />
+            {isUploading && (
+              <p className="text-xs text-primary mt-2">Processando arquivo...</p>
+            )}
           </div>
         )}
       </div>
@@ -89,7 +111,7 @@ export default function Sidebar() {
               setConversationId(id)
               setShowHistory(false)
             }}
-            currentConversationId={conversationId}
+            currentConversationId={conversationId || undefined}
           />
         </div>
       )}

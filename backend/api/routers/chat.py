@@ -46,19 +46,33 @@ async def chat(
         )
         
         # Processar com LLM Manager
-        if settings.USE_OPENRAG:
-            # Usar OpenRAG
-            response_text = await llm_manager.chat(
-                query=request.query,
-                context=request.context
-            )
+        # Sempre tentar usar RAG se houver documentos indexados
+        try:
+            from ..rag_service import RAGService
+            rag = RAGService()
+            stats = rag.get_stats()
             
-            # Buscar documentos relevantes
-            sources = await llm_manager.search(request.query, top_k=3)
-            source_names = [s.get('metadata', {}).get('filename', 'unknown') for s in sources]
-            
-        else:
-            # Usar LLM legado
+            if stats['total_documents'] > 0:
+                # Usar RAG se houver documentos
+                logger.info(f"Usando RAG: {stats['total_documents']} documentos disponíveis")
+                response_text = await llm_manager.generate_with_rag(
+                    query=request.query,
+                    top_k=3,
+                    context=request.context
+                )
+                source_docs = await llm_manager.search(request.query, top_k=3)
+                source_names = [doc.get('metadata', {}).get('filename', 'Documento') for doc in source_docs]
+            else:
+                # Sem documentos, usar LLM simples
+                logger.info("Sem documentos indexados, usando LLM simples")
+                response_text = await llm_manager.generate_response(
+                    query=request.query,
+                    context=request.context
+                )
+                source_names = []
+        except Exception as e:
+            logger.error(f"Erro ao usar RAG: {e}")
+            # Fallback para LLM simples
             response_text = await llm_manager.generate_response(
                 query=request.query,
                 context=request.context
