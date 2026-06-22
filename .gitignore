@@ -47,10 +47,45 @@ env/
 .DS_Store
 Thumbs.db
 
-# Arquivos específicos do projeto
+# Arquivos específicos do projeto (legado logístico)
 Dados_Consolidados.xlsx
 importação.xlsx
 exportação.xlsx
 cabotagem.xlsx
 clientes.txt
+
+# Ambiente e segredos
 .env
+*.env.local
+
+# Artefatos FAISS / Vector store (binários grandes)
+*.faiss
+*.pkl
+backend/vector_index.faiss
+backend/documents.pkl
+
+# Dados de usuário e catálogo (não versionar)
+dados/
+!dados/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# Build frontend
+frontend/dist/
+frontend/node_modules/
+
+# Python packaging
+backend/venv/
+*.egg-info/
+dist/
+build/
+
+# Uploads
+dados/uploads/
+
+# Cobertura de testes
+.coverage
+htmlcov/
+.pytest_cache/

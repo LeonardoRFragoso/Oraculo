@@ -1,344 +1,231 @@
-# 🔮 ORÁCULO - Seu Consultor de IA para Decisões Estratégicas
+# 🔮 Oráculo — Plataforma Universal de Inteligência Corporativa
 
-**Oráculo** é um assistente de inteligência artificial de última geração, especializado em análise de dados comerciais e logísticos. Combinando o poder do **OpenRAG** com uma interface moderna e intuitiva, oferece insights profundos e análises preditivas através de conversação natural.
+**Oráculo** é uma plataforma enterprise de inteligência sobre dados — conecta qualquer fonte de dados, entende o contexto de negócio automaticamente, responde perguntas em linguagem natural, detecta anomalias, gera insights proativos e executa ações autônomas.
 
-> **Anteriormente conhecido como GPTRACKER** - Transformado em um produto independente e moderno.
-
----
-
-## 🚀 **Arquitetura Moderna**
-
-O Oráculo utiliza **OpenRAG**, a stack mais moderna de RAG do mercado, com arquitetura separada:
-
-- 🎨 **Frontend React** - Interface moderna estilo ChatGPT/Claude
-- 🐍 **Backend Python** - API REST com Streamlit
-- 🔍 **OpenRAG Stack** - OpenSearch + Langflow + Docling
-- 🐳 **Docker** - Containerização completa
-
-### **Benefícios**
-
-- ✅ **10x mais rápido** em buscas semânticas
-- ✅ **Suporte a PDF, DOCX, PPTX** além de Excel/CSV
-- ✅ **OCR nativo** para documentos escaneados
-- ✅ **Busca híbrida** (vetorial + keyword) com reranking
-- ✅ **Workflows visuais** no Langflow
-- ✅ **Escalabilidade horizontal** com OpenSearch
-
-👉 **[Documentação Completa](docs/)** | **[Quickstart OpenRAG](docs/QUICKSTART_OPENRAG.md)** | **[Branding](docs/ORACULO_BRANDING.md)**
+> Posicionamento: concorrente de Palantir / Databricks / Snowflake. Não é um chatbot.
 
 ---
 
-## 📁 Estrutura do Projeto
+## ✨ Capacidades
 
-```
-Oraculo/
-├── backend/                    # 🐍 Backend Python
-│   ├── src/                   # Código fonte
-│   ├── scripts/               # Scripts de automação
-│   ├── tests/                 # Testes
-│   ├── gptracker.py          # App Streamlit (legado)
-│   ├── oraculo.py            # App Streamlit (novo)
-│   └── requirements*.txt     # Dependências
-│
-├── frontend/                   # ⚛️ Frontend React
-│   ├── src/                   # Código React
-│   ├── public/                # Assets públicos
-│   └── package.json           # Dependências Node
-│
-├── docs/                       # 📚 Documentação
-│   ├── QUICKSTART_OPENRAG.md
-│   ├── MIGRATION_PLAN.md
-│   ├── ORACULO_BRANDING.md
-│   └── ...
-│
-├── langflow_workflows/         # 🔄 Workflows Langflow
-│   ├── data_ingestion.json
-│   └── rag_chat.json
-│
-├── docker-compose.openrag.yml  # 🐳 Docker Compose
-├── Makefile                    # 🛠️ Comandos úteis
-└── README.md                   # 📖 Este arquivo
-```
+| Módulo | O que faz |
+|---|---|
+| **Semantic Engine** | Classifica automaticamente qualquer dataset em domínio de negócio (Financeiro, RH, CRM, Logística, etc.) |
+| **Universal Connectors** | Conecta CSV, Excel, JSON, Parquet, PDF/DOCX, PostgreSQL, MySQL, SQLite |
+| **Metadata Catalog** | Schema discovery automático, profiling estatístico, score de qualidade A–F |
+| **NL2SQL** | Transforma perguntas em português em SQL válido e seguro, executado via DuckDB |
+| **Hybrid RAG** | Combina busca vetorial (FAISS) em documentos + NL2SQL em dados estruturados |
+| **AI Data Analyst** | Gera KPIs, detecta anomalias e produz executive summary ao conectar uma fonte |
+| **Agent Actions** | Planeja e executa ações autônomas: alertas, relatórios, notificações |
+| **Knowledge Graph** | Extrai entidades e relações dos dados, constrói grafo navegável |
 
 ---
 
-## 🌟 Principais Funcionalidades
-
-### 💬 Chat Inteligente com RAG
-- ✨ **Interface moderna** estilo ChatGPT/Claude (React)
-- 🤖 **GPT-4 Turbo** para conversação natural
-- 🔍 **OpenRAG** - Sistema RAG enterprise-grade
-- 📁 **Upload múltiplo** de planilhas, PDFs, DOCXs
-- 🔄 **Monitoramento automático** de alterações
-- 💾 **Cache inteligente** (reduz custos em 50%)
-
-### 📊 Dashboard Executivo
-- KPIs em tempo real
-- Análise de performance vs budget
-- Visualizações interativas com Plotly
-- Insights proativos automatizados
-
-### 🎯 Gestão de Budget e Metas
-- Definição de metas anuais, mensais e por cliente
-- Acompanhamento de performance em tempo real
-- Identificação automática de oportunidades comerciais
-
-### 📈 Análises Preditivas
-- Previsão de demanda usando machine learning
-- Análise de sazonalidade
-- Identificação de oportunidades de crescimento
-- Cálculo de Customer Lifetime Value (CLV)
-
-### 🔒 Segurança Avançada
-- Sistema de autenticação com JWT
-- Controle de acesso baseado em roles
-- Auditoria completa de ações
-- Criptografia de dados sensíveis
-
-### 📁 Gestão Inteligente de Dados
-- **Upload múltiplo** de arquivos Excel/CSV
-- Ingestão automática de múltiplos formatos (Excel, CSV, JSON)
-- Validação e normalização automática
-- Detecção automática de tipos de dados
-- Sistema de backup e arquivamento
-
-### ☁️ Integração Universal com Nuvem
-- Google Sheets, OneDrive, SharePoint, Dropbox
-- Box, iCloud e links diretos de planilhas
-- **Carregamento em lote** de múltiplos links
-- Detecção automática de provedores
-- Conversão automática de URLs de visualização para download
-
-## 🏗️ Arquitetura do Sistema
+## 🏗️ Arquitetura
 
 ```
-GPTRACKER/
-├── gptracker_simple.py      # Interface simplificada com chat
-├── gptracker_main.py        # Aplicação principal integrada
-├── src/
-│   ├── auth.py              # Sistema de autenticação
-│   ├── advanced_llm.py      # LLM avançado com RAG
-│   ├── auto_sync_manager.py # Monitoramento automático
-│   ├── universal_cloud_integration.py # Integração nuvem
-│   ├── dashboard.py         # Dashboard executivo
-│   ├── budget_manager.py    # Gestão de budget e metas
-│   ├── predictive_analytics.py # Análises preditivas
-│   ├── data_ingestion.py    # Ingestão de dados
-│   ├── security_manager.py  # Segurança e auditoria
-│   └── api_server.py        # API REST
-├── dados/
-│   ├── processed/           # Dados processados
-│   ├── raw/                 # Dados brutos
-│   ├── chat_history/        # Histórico de conversas
-│   └── archive/             # Arquivos arquivados
-├── requirements.txt         # Dependências
-└── README.md               # Esta documentação
+Oráculo/
+├── backend/                    # FastAPI (Python 3.11)
+│   ├── api/                   # Routers, middlewares, config
+│   ├── catalog/               # Semantic Engine, Registry, Profiler, Quality
+│   ├── connectors/            # 8 conectores (files + databases)
+│   ├── nl2sql/                # Engine, Validator, Executor (DuckDB), Router
+│   ├── rag/                   # VectorStore (FAISS), DocumentIndexer, HybridRetriever
+│   ├── analyst/               # KPIGenerator, AnomalyDetector, InsightEngine
+│   ├── actions/               # ActionPlanner, ActionRegistry, Builtins
+│   ├── graph/                 # EntityExtractor, RelationBuilder, KnowledgeGraph
+│   ├── core/                  # LLMClient (Anthropic/OpenAI), logging_config
+│   ├── db/                    # SQLAlchemy models (PostgreSQL/SQLite), Alembic
+│   ├── scripts/               # migrate_json_to_pg.py
+│   ├── tests/                 # pytest suite (auth, nl2sql, connectors)
+│   └── requirements.prod.txt  # Dependências consolidadas
+│
+├── frontend/                   # React 18 + Vite + TailwindCSS
+│   └── src/
+│       ├── pages/             # Chat, DataSources, Analytics, Alerts, Graph, Settings
+│       ├── services/api.ts    # Axios client com JWT interceptor
+│       └── contexts/          # Auth, Chat, Theme
+│
+├── Dockerfile.backend          # Python 3.11, non-root user
+├── Dockerfile.frontend         # Node 20 build → nginx
+├── docker-compose.yml          # backend + frontend + postgres + redis
+├── deploy/nginx.conf           # SPA fallback + proxy /api/
+├── .env.example                # Variáveis necessárias
+└── legacy/                     # Código legado (Streamlit, logística) — não usado
 ```
 
-## 🚀 Instalação e Configuração
+**Stack:**
+- Backend: FastAPI 0.109 · Python 3.11 · SQLAlchemy 2 · Alembic
+- Frontend: React 18 · Vite · TailwindCSS · Recharts
+- LLM: Anthropic Claude (primário) · OpenAI GPT-4o (fallback)
+- Vector store: FAISS per-source (TF-IDF fallback sem API key)
+- Database: PostgreSQL (produção) · SQLite (desenvolvimento)
+- Auth: JWT HS256 · passlib sha256_crypt
 
-### 1. Pré-requisitos
-- Python 3.8+
-- Chave de API da OpenAI
+---
 
-### 2. Instalação
+## 🚀 Início Rápido
+
+### Opção 1 — Docker (recomendado para produção)
 
 ```bash
-# Clonar o repositório
-git clone https://github.com/LeonardoRFragoso/GPTracker.git
-cd GPTracker
+# 1. Configurar variáveis
+cp .env.example .env
+# Preencher: SECRET_KEY, POSTGRES_PASSWORD, ANTHROPIC_API_KEY ou OPENAI_API_KEY
 
-# Criar ambiente virtual
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# ou
-venv\Scripts\activate     # Windows
+# 2. Subir todos os serviços
+docker-compose up --build
 
-# Instalar dependências
-pip install -r requirements.txt
+# 3. (Opcional) Migrar dados existentes de JSON → PostgreSQL
+docker-compose exec backend python scripts/migrate_json_to_pg.py
 ```
 
-### 3. Configuração de Ambiente
+Acesse: **http://localhost** (frontend) · **http://localhost:5000/docs** (API)
 
-Crie um arquivo `.env` na raiz do projeto:
+---
+
+### Opção 2 — Desenvolvimento local
+
+**Pré-requisitos:** Python 3.11+, Node 20+
+
+```bash
+# Backend
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.prod.txt
+cp ../.env.example ../.env   # preencher vars
+uvicorn api.main:app --reload --port 5000
+
+# Frontend (outro terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+Acesse: **http://localhost:5173**
+
+**Credenciais padrão:** `admin` / `admin123`
+
+---
+
+## ⚙️ Configuração
+
+Copie `.env.example` para `.env` e preencha:
 
 ```env
-OPENAI_API_KEY=sua-chave-openai-aqui
-JWT_SECRET_KEY=sua-chave-jwt-secreta
-API_PORT=5000
-FLASK_ENV=development
+# Obrigatório — gerar com: python -c "import secrets; print(secrets.token_hex(32))"
+SECRET_KEY=
+
+# LLM — pelo menos um é necessário
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+
+# Banco de dados (PostgreSQL em produção, SQLite é criado automaticamente em dev)
+DATABASE_URL=postgresql://oraculo:senha@localhost:5432/oraculo
+POSTGRES_PASSWORD=
+
+# Ambiente
+ENVIRONMENT=development   # development | production
 ```
 
-### 4. Estrutura de Dados
+---
 
-Coloque seus arquivos de dados na pasta `dados/`:
-- `Dados_Consolidados.xlsx` - Dados principais
-- Outros arquivos serão processados automaticamente
+## 🔌 API — Endpoints Principais
 
-## 💻 Como Usar
+```http
+# Autenticação
+POST /api/auth/login          { "username": "admin", "password": "admin123" }
 
-### Executar GPTRACKER (Interface Simples)
+# Fontes de dados
+GET  /api/datasources         Lista todas as fontes
+POST /api/datasources/register Registra nova fonte (DB)
+POST /api/datasources/upload   Upload de arquivo (CSV, Excel, PDF...)
+POST /api/datasources/{id}/connect  Conecta e descobre schema
+
+# Inteligência
+POST /api/query               Pergunta universal (NL2SQL + RAG roteado)
+POST /api/datasources/{id}/analyze  KPIs + anomalias + executive summary
+POST /api/datasources/{id}/act      Agent Actions
+GET  /api/datasources/{id}/graph    Knowledge Graph
+
+# Sistema
+GET  /api/health              Status real de todos os subsistemas
+GET  /api/ping                Liveness probe
+```
+
+Documentação interativa: **http://localhost:5000/docs**
+
+---
+
+## 🧪 Testes
 
 ```bash
-streamlit run gptracker_simple.py
+cd backend
+pip install -r requirements.test.txt
+pytest                    # Todos os testes
+pytest tests/test_auth.py       # Somente autenticação
+pytest tests/test_nl2sql.py     # Somente NL2SQL
+pytest --cov --cov-report=html  # Com cobertura
 ```
 
-### Executar GPTRACKER (Interface Completa)
+**Cobertura mínima configurada: 60%**
 
-```bash
-streamlit run gptracker_main.py
-```
-
-### Executar API REST (opcional)
-
-```bash
-python src/api_server.py
-```
-
-### Usuários Padrão
-
-O sistema cria automaticamente os seguintes usuários:
-
-| Usuário | Senha | Role | Permissões |
-|---------|-------|------|------------|
-| admin | admin123 | admin | Todas |
-| comercial | comercial123 | comercial | Leitura, Analytics, Budget |
-| operacional | operacional123 | operacional | Leitura, Analytics |
-
-## 🎯 Funcionalidades por Módulo
-
-### 📊 Dashboard
-- **KPIs Principais**: Containers, operações, clientes únicos
-- **Performance vs Budget**: Gauges de acompanhamento de metas
-- **Análise de Tendências**: Gráficos temporais interativos
-- **Análise Operacional**: Distribuição por tipo de operação e top clientes
-
-### 💬 Chat GPT
-- **Perguntas Naturais**: "Quantos containers a Michelin movimentou em 2024?"
-- **Insights Contextualizados**: Respostas baseadas em dados reais
-- **Histórico de Conversas**: Mantém contexto das interações
-- **Upload Múltiplo**: Carregue várias planilhas de uma vez
-- **Monitoramento Automático**: Detecta alterações nas planilhas automaticamente
-
-### 📈 Análises Avançadas
-- **Previsões**: Demanda futura baseada em histórico
-- **Sazonalidade**: Identificação de padrões temporais
-- **Oportunidades**: Clientes com potencial de upsell
-- **CLV**: Valor do tempo de vida do cliente
-
-### 🎯 Budget & Metas
-- **Definição de Metas**: Anuais, mensais e por cliente
-- **Acompanhamento**: Performance em tempo real
-- **Alertas**: Notificações de desvios significativos
-
-### 📁 Gestão de Dados
-- **Upload Múltiplo**: Selecione e processe vários arquivos simultaneamente
-- **Barra de Progresso**: Acompanhe o processamento em tempo real
-- **Validação**: Verificação de integridade e qualidade
-- **Processamento**: Normalização e padronização automática
-
-## 🔧 API REST
-
-### Endpoints Principais
-
-#### Autenticação
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "username": "admin",
-  "password": "admin123"
-}
-```
-
-#### Dados de Containers
-```http
-GET /api/data/containers?ano=2024&mes=1&cliente=MICHELIN
-Authorization: Bearer <token>
-```
-
-#### Performance vs Budget
-```http
-GET /api/budget/performance
-Authorization: Bearer <token>
-```
-
-#### Oportunidades Comerciais
-```http
-GET /api/analytics/opportunities
-Authorization: Bearer <token>
-```
+---
 
 ## 🔒 Segurança
 
-### Controle de Acesso
-- **Autenticação JWT**: Tokens seguros com expiração
-- **Roles e Permissões**: Controle granular de acesso
-- **Auditoria**: Log completo de todas as ações
-
-### Proteção de Dados
-- **Criptografia**: Dados sensíveis criptografados
-- **Backup Automático**: Proteção contra perda de dados
-- **Validação**: Verificação de integridade contínua
-
-## 📊 Tipos de Dados Suportados
-
-### Logístico
-- **Obrigatórios**: qtd_container, cliente, ano_mes
-- **Opcionais**: tipo_operacao, porto, armador, navio
-
-### Comercial
-- **Obrigatórios**: cliente, receita, periodo
-- **Opcionais**: vendedor, regiao, produto, margem
-
-### Budget
-- **Obrigatórios**: periodo, meta_receita, meta_containers
-- **Opcionais**: departamento, responsavel, observacoes
-
-### Oportunidades
-- **Obrigatórios**: cliente, valor_estimado, probabilidade, data_fechamento
-- **Opcionais**: origem, responsavel, status, observacoes
-
-## 🚀 Próximos Passos
-
-1. **Adicione suas planilhas** usando upload múltiplo ou links de nuvem
-2. **Configure as metas** através da interface
-3. **Explore o chat** fazendo perguntas sobre seus dados
-4. **Monitore o dashboard** para acompanhar performance
-5. **Use as previsões** para planejamento estratégico
-
-## 🆘 Suporte
-
-Para suporte técnico ou dúvidas sobre funcionalidades:
-1. Consulte os logs de sistema
-2. Verifique a documentação da API
-3. Use o sistema de auditoria para diagnósticos
-
-## 📝 Changelog
-
-### v2.1.0 - Upload Múltiplo e Auto-Sync
-- ✨ **Upload múltiplo** de planilhas locais
-- 🌐 **Carregamento em lote** de links de nuvem
-- 📊 **Barras de progresso** para processamento
-- 🔄 **Monitoramento automático** de alterações
-- 🎯 **Interface simplificada** para melhor UX
-
-### v2.0.0 - GPTRACKER
-- ✨ Sistema completo de autenticação
-- 📊 Dashboard executivo interativo
-- 🎯 Gestão de budget e metas
-- 📈 Análises preditivas avançadas
-- 💬 Chat com RAG e GPT-4 Turbo
-- 🔒 Segurança e auditoria completa
-- 📁 Sistema de ingestão de dados flexível
-- 🌐 API REST completa
-
-### v1.0.0 - Oráculo
-- 📊 Análise básica de dados logísticos
-- 💬 Interface conversacional simples
-- 📈 Relatórios estáticos
+- **JWT obrigatório** em todas as rotas (`REQUIRE_AUTH=True`)
+- **Middleware valida assinatura e expiração** do token a cada request
+- **SECRET_KEY** deve ser definida via env — sistema avisa e usa chave efêmera se ausente
+- **Falha rápida em produção** se `SECRET_KEY` não configurada
+- **Senhas mascaradas** nas respostas da API (nunca expostas)
+- **SQL injection** bloqueado no `SQLValidator` antes de qualquer execução
+- **Trace ID** em todos os requests (`X-Trace-ID`) para auditoria
 
 ---
 
-**GPTRACKER** - Transformando dados em insights acionáveis para a Itracker 🚀
+## 📊 Connectors Disponíveis
+
+| Conector | Tipo | Status |
+|---|---|---|
+| CSV | Arquivo | ✅ |
+| Excel (XLSX/XLS) | Arquivo | ✅ |
+| JSON | Arquivo | ✅ |
+| Parquet | Arquivo | ✅ |
+| PDF / DOCX / TXT | Documento | ✅ |
+| PostgreSQL | Banco | ✅ |
+| MySQL / MariaDB | Banco | ✅ |
+| SQLite | Banco | ✅ |
+| MongoDB | Banco | 🔜 |
+| Amazon S3 | Cloud | 🔜 |
+| REST API genérica | Cloud | 🔜 |
+
+---
+
+## 📝 Changelog
+
+### v4.0.0 — Hardening & Production-Ready
+- 🔒 Autenticação JWT real ativada (middleware com validação de assinatura)
+- 🐳 Docker completo: backend + frontend + PostgreSQL + Redis
+- 🗄️ SQLAlchemy + Alembic: migração de JSON files para PostgreSQL
+- 🧪 Suite de testes: auth, NL2SQL, connectors, semantic engine
+- 📊 Structured logging (JSON em produção, trace IDs por request)
+- 🏥 Health check real: LLM, vector store, DB, catalog, auth
+- 🧹 Código legado isolado em `legacy/`
+
+### v3.0.0 — Feature Complete (Sprints 0–7)
+- ⚙️ Universal Semantic Engine (10 domínios de negócio)
+- 🔌 8 Universal Connectors (arquivos + bancos de dados)
+- 📚 Metadata Catalog (schema discovery, profiling, quality score)
+- 🗣️ NL2SQL com validação e execução DuckDB
+- 🔍 Hybrid RAG (FAISS per-source + document indexer)
+- 🤖 AI Data Analyst (KPIs, anomalias, executive summary)
+- ⚡ Agent Actions (planner, alertas, relatórios)
+- 🕸️ Knowledge Graph (NetworkX, entity extraction, relation building)
+- ⚛️ Frontend React completo (6 páginas conectadas ao backend)
+
+### v2.x — GPTRACKER (legado, ver `legacy/`)
+
+---
+
+**Oráculo v4.0** — Transformando qualquer dado em inteligência corporativa acionável 🔮
