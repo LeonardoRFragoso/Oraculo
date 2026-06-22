@@ -23,17 +23,23 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
         "http://127.0.0.1:5173",
     ]
     
     # Autenticação
-    REQUIRE_AUTH: bool = False
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    REQUIRE_AUTH: bool = True
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "")
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8h
     
+    # Database
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    DATA_DIR: str = os.getenv("DATA_DIR", "../dados")
+
     # OpenAI
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = "gpt-4-turbo"

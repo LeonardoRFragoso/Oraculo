@@ -9,6 +9,8 @@ import logging
 import time
 from typing import Callable
 
+from core.logging_config import new_trace_id, set_trace_id
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,33 +42,68 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """Middleware para autenticação (simplificado)"""
-    
-    EXCLUDED_PATHS = ["/", "/docs", "/redoc", "/openapi.json", "/api/health", "/api/ping"]
-    
+    """Middleware de autenticação JWT real — valida assinatura e expiração."""
+
+    # Paths que não requerem autenticação
+    PUBLIC_PATHS = {
+        "/",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/api/health",
+        "/api/ping",
+        "/api/auth/login",
+        "/api/auth/register",
+    }
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Verificar se path está excluído
-        if request.url.path in self.EXCLUDED_PATHS:
+        # Permitir CORS preflight sem token
+        if request.method == "OPTIONS":
             return await call_next(request)
-        
-        # Verificar token (simplificado)
-        auth_header = request.headers.get("Authorization")
-        
-        if not auth_header:
-            raise HTTPException(
-                status_code=401,
-                detail="Token de autenticação não fornecido"
-            )
-        
-        # TODO: Implementar validação real do token JWT
-        # Por enquanto, aceita qualquer token que comece com "Bearer "
+
+        if request.url.path in self.PUBLIC_PATHS:
+            return await call_next(request)
+
+        auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
-            raise HTTPException(
+            return Response(
+                content='{"detail":"Token de autenticação não fornecido"}',
                 status_code=401,
-                detail="Formato de token inválido"
+                media_type="application/json",
             )
-        
+
+        token = auth_header[len("Bearer "):]
+        try:
+            from .auth_service import AuthService
+            _auth = AuthService()
+            payload = _auth.decode_token(token)
+            if payload is None:
+                raise ValueError("Token inválido ou expirado")
+            # Injetar username no state para uso nos routers
+            request.state.username = payload.get("sub")
+        except Exception as e:
+            logger.warning(f"Auth falhou para {request.url.path}: {e}")
+            return Response(
+                content=f'{{"detail":"Token inválido ou expirado"}}',
+                status_code=401,
+                media_type="application/json",
+            )
+
         return await call_next(request)
+
+
+class TraceMiddleware(BaseHTTPMiddleware):
+    """Injects a unique trace ID per request for structured logging and correlation."""
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Use client-provided trace ID if present (distributed tracing), else generate
+        trace_id = request.headers.get("X-Trace-ID") or new_trace_id()
+        set_trace_id(trace_id)
+        request.state.trace_id = trace_id
+
+        response = await call_next(request)
+        response.headers["X-Trace-ID"] = trace_id
+        return response
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):

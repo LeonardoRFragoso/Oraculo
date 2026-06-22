@@ -22,10 +22,18 @@ class AuthService:
         self,
         secret_key: Optional[str] = None,
         algorithm: str = "HS256",
-        access_token_expire_minutes: int = 30,
+        access_token_expire_minutes: int = 480,
         users_file: str = "../dados/users.json"
     ):
-        self.secret_key = secret_key or os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+        _key = secret_key or os.getenv("SECRET_KEY", "")
+        if not _key:
+            import secrets
+            _key = secrets.token_hex(32)
+            logger.warning(
+                "SECRET_KEY not set in environment — generated ephemeral key. "
+                "Tokens will be invalidated on restart. Set SECRET_KEY in .env for production."
+            )
+        self.secret_key = _key
         self.algorithm = algorithm
         self.access_token_expire_minutes = access_token_expire_minutes
         

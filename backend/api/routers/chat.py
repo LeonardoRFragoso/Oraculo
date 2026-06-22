@@ -1,138 +1,148 @@
 """
-Router de Chat
+Router de Chat — unified architecture (QueryRouter + HybridRetriever)
+
+Replaces legacy rag_service.py + llm_service.py dependency.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List
-import logging
-from datetime import datetime
+import sys
 import uuid
+from pathlib import Path
+from typing import List, Optional
+import logging
+
+from fastapi import APIRouter, HTTPException, Depends
 
 from ..models import ChatRequest, ChatResponse, ChatMessage, Insight, InsightType
-from ..config import settings
-from ..dependencies import get_llm_manager
 from ..conversation_store import ConversationStore
 
+_root = Path(__file__).parent.parent.parent
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
+
+from catalog.registry import DataSourceRegistry
+from nl2sql.router import QueryRouter, QueryType
+from rag.hybrid_retriever import HybridRetriever
+from core.llm_client import LLMClient
+
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
-
-# Instância global do store de conversas
 conversation_store = ConversationStore()
+
+# Singletons — mesmos do query.py para consistência
+_registry = DataSourceRegistry()
+_query_router = QueryRouter()
+_hybrid = HybridRetriever()
+_llm = LLMClient()
+
+_FALLBACK_SYSTEM = (
+    "Você é o Oráculo, assistente de inteligência corporativa. "
+    "Responda de forma clara e objetiva. "
+    "Se não tiver dados conectados, oriente o usuário a adicionar fontes de dados."
+)
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(
-    request: ChatRequest,
-    llm_manager = Depends(get_llm_manager)
-):
+async def chat(request: ChatRequest):
     """
-    Endpoint principal de chat
-    
-    Processa uma pergunta do usuário e retorna uma resposta gerada pela IA,
-    junto com insights e sugestões relevantes.
+    Endpoint de chat — roteado pela nova arquitetura unificada:
+      - Com fontes conectadas: NL2SQL / RAG / Hybrid via QueryRouter
+      - Sem fontes: resposta LLM direta com orientação
     """
     try:
-        logger.info(f"Chat request: {request.query[:100]}...")
-        
-        # Gerar conversation_id se não fornecido
         conversation_id = request.conversation_id or conversation_store.create_conversation()
-        
-        # Salvar mensagem do usuário
-        conversation_store.add_message(
-            conversation_id=conversation_id,
-            role="user",
-            content=request.query
-        )
-        
-        # Processar com LLM Manager
-        # Sempre tentar usar RAG se houver documentos indexados
-        try:
-            from ..rag_service import RAGService
-            rag = RAGService()
-            stats = rag.get_stats()
-            
-            logger.info(f"📊 RAG Stats: {stats}")
-            
-            if stats['total_documents'] > 0:
-                # Usar RAG se houver documentos
-                logger.info(f"✓ Usando RAG: {stats['total_documents']} documentos disponíveis")
-                logger.info(f"📝 Query: {request.query}")
-                
-                response_text = await llm_manager.generate_with_rag(
-                    query=request.query,
-                    top_k=3,
-                    context=request.context
-                )
-                source_docs = await llm_manager.search(request.query, top_k=3)
-                logger.info(f"🔍 Documentos encontrados na busca: {len(source_docs)}")
-                
-                if source_docs:
-                    for i, doc in enumerate(source_docs):
-                        logger.info(f"  Doc {i+1}: score={doc.get('score', 0):.4f}, similarity={doc.get('similarity', 0):.4f}")
-                        logger.info(f"  Conteúdo: {doc.get('content', '')[:100]}...")
-                
-                source_names = [doc.get('metadata', {}).get('filename', 'Documento') for doc in source_docs]
-            else:
-                # Sem documentos, usar LLM simples
-                logger.warning("⚠️ Sem documentos indexados, usando LLM simples")
-                response_text = await llm_manager.generate_response(
-                    query=request.query,
-                    context=request.context
-                )
-                source_names = []
-        except Exception as e:
-            logger.error(f"✗ Erro ao usar RAG: {e}", exc_info=True)
-            # Fallback para LLM simples
-            response_text = await llm_manager.generate_response(
-                query=request.query,
-                context=request.context
-            )
-            source_names = []
-        
-        # Gerar insights (exemplo - pode ser mais sofisticado)
-        insights = []
-        if "crescimento" in response_text.lower() or "aumento" in response_text.lower():
-            insights.append(Insight(
-                id=str(uuid.uuid4()),
-                type=InsightType.TREND,
-                title="Tendência de Crescimento Detectada",
-                description="Identificado padrão de crescimento nos dados analisados",
-                confidence=0.75
-            ))
-        
-        # Gerar sugestões
-        suggestions = [
-            "Ver detalhes por cliente",
-            "Comparar com período anterior",
-            "Analisar tendências sazonais"
+        conversation_store.add_message(conversation_id, role="user", content=request.query)
+
+        answer = ""
+        sources: List[str] = []
+        query_type = "direct"
+
+        # Obter fontes conectadas
+        connected_sources = [
+            s for s in _registry.list()
+            if s.status in ("connected", "profiled", "analyzed")
         ]
-        
-        # Salvar resposta do assistente
+
+        if connected_sources:
+            # Rotear pergunta
+            decision = _query_router.route(request.query, connected_sources)
+            query_type = decision.query_type.value
+            logger.info(f"Chat routed as '{query_type}' for: {request.query[:80]}")
+
+            if decision.query_type in (QueryType.NL2SQL, QueryType.RAG, QueryType.HYBRID):
+                suggested = decision.suggested_sources or [s.id for s in connected_sources[:3]]
+                struct_sources = [
+                    s for s in connected_sources
+                    if s.id in suggested and s.connector_type not in ("pdf", "docx", "txt", "xml")
+                ]
+                doc_sources = [
+                    s for s in connected_sources
+                    if s.id in suggested and s.connector_type in ("pdf", "docx", "txt", "xml")
+                ]
+
+                try:
+                    result = await _hybrid.retrieve(
+                        question=request.query,
+                        structured_sources=struct_sources or None,
+                        document_sources=doc_sources or None,
+                    )
+                    answer = result.answer
+                    sources = list({
+                        s.name for s in connected_sources
+                        if s.id in (result.source_ids or [])
+                    })
+                except Exception as e:
+                    logger.warning(f"Hybrid retrieval failed, falling back to LLM: {e}")
+
+        if not answer:
+            # Fallback: LLM direto com contexto de fontes disponíveis
+            ctx_hint = ""
+            if connected_sources:
+                names = ", ".join(s.name for s in connected_sources[:5])
+                ctx_hint = f"\n\nFontes de dados conectadas: {names}."
+            resp = _llm.chat(
+                system=_FALLBACK_SYSTEM,
+                user=request.query + ctx_hint,
+                temperature=0.4,
+                max_tokens=800,
+            )
+            answer = resp.content
+
         conversation_store.add_message(
-            conversation_id=conversation_id,
-            role="assistant",
-            content=response_text,
-            metadata={
-                'insights_count': len(insights),
-                'sources_count': len(source_names)
-            }
+            conversation_id, role="assistant", content=answer,
+            metadata={"query_type": query_type, "sources": sources}
         )
-        
+
+        # Insight simples baseado em palavras-chave
+        insights: List[Insight] = []
+        _kw = answer.lower()
+        if any(w in _kw for w in ("crescimento", "aumento", "alta", "elevação")):
+            insights.append(Insight(
+                id=str(uuid.uuid4()), type=InsightType.TREND,
+                title="Tendência de Crescimento", description="Padrão de crescimento detectado na resposta.",
+                confidence=0.7,
+            ))
+        elif any(w in _kw for w in ("queda", "redução", "diminuição", "declínio")):
+            insights.append(Insight(
+                id=str(uuid.uuid4()), type=InsightType.ANOMALY,
+                title="Tendência de Queda", description="Padrão de queda detectado na resposta.",
+                confidence=0.7,
+            ))
+
         return ChatResponse(
-            response=response_text,
+            response=answer,
             conversation_id=conversation_id,
             insights=insights,
-            suggestions=suggestions,
-            sources=source_names
+            suggestions=[
+                "Adicionar mais fontes de dados",
+                "Ver análise detalhada em AI Analyst",
+                "Configurar alertas automáticos",
+            ],
+            sources=sources,
         )
-        
+
     except Exception as e:
-        logger.error(f"Erro no chat: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao processar chat: {str(e)}"
-        )
+        logger.error(f"Chat error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro ao processar chat: {str(e)}")
 
 
 @router.get("/chat/history/{conversation_id}", response_model=List[ChatMessage])

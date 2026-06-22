@@ -1,84 +1,117 @@
 """
-Router de Health Check
+Health check endpoints — real status for all subsystems.
 """
 
-from fastapi import APIRouter
-from datetime import datetime
-import logging
-import httpx
+import os
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict
 
-from ..models import HealthStatus
+import logging
+from fastapi import APIRouter
 from ..config import settings
 
+_root = Path(__file__).parent.parent.parent
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
+
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
+_start_time = time.time()
 
 
-async def check_service(url: str, timeout: float = 2.0) -> bool:
-    """Verificar se um serviço está online"""
+def _check_llm() -> Dict[str, Any]:
+    anthropic_key = bool(os.getenv("ANTHROPIC_API_KEY", "").startswith("sk-ant-"))
+    openai_key = bool(os.getenv("OPENAI_API_KEY", "").startswith("sk-"))
+    provider = "anthropic" if anthropic_key else ("openai" if openai_key else None)
+    return {
+        "available": provider is not None,
+        "provider": provider or "none",
+        "anthropic_key_set": anthropic_key,
+        "openai_key_set": openai_key,
+    }
+
+
+def _check_vector_store() -> Dict[str, Any]:
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, timeout=timeout)
-            return response.status_code == 200
+        data_dir = Path(settings.DATA_DIR) if hasattr(settings, "DATA_DIR") else Path("../dados")
+        vs_dir = data_dir / "vector_store"
+        indices = list(vs_dir.glob("*/faiss_index.bin")) if vs_dir.exists() else []
+        return {"available": True, "backend": "faiss", "indexed_sources": len(indices)}
     except Exception as e:
-        logger.debug(f"Serviço {url} offline: {e}")
-        return False
+        return {"available": False, "error": str(e)}
 
 
-@router.get("/health", response_model=HealthStatus)
+def _check_database() -> Dict[str, Any]:
+    db_url = os.getenv("DATABASE_URL", "")
+    if not db_url:
+        data_dir = os.getenv("DATA_DIR", "../dados")
+        sqlite_path = Path(data_dir) / "oraculo.db"
+        return {
+            "available": sqlite_path.exists(),
+            "backend": "sqlite",
+            "path": str(sqlite_path),
+        }
+    backend = "postgresql" if "postgresql" in db_url or "postgres" in db_url else "other"
+    return {"available": True, "backend": backend}
+
+
+def _check_catalog() -> Dict[str, Any]:
+    try:
+        from catalog.registry import DataSourceRegistry
+        reg = DataSourceRegistry()
+        sources = reg.list()
+        connected = [s for s in sources if s.status in ("connected", "profiled", "analyzed")]
+        return {
+            "available": True,
+            "total_sources": len(sources),
+            "connected_sources": len(connected),
+        }
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@router.get("/health")
 async def health_check():
-    """
-    Health check do sistema
-    
-    Verifica o status de todos os serviços:
-    - OpenRAG
-    - OpenSearch
-    - Langflow
-    - Redis
-    """
-    
-    # Verificar serviços
-    openrag_status = False
-    opensearch_status = False
-    langflow_status = False
-    redis_status = False
-    
-    if settings.USE_OPENRAG:
-        # Verificar OpenRAG/Langflow
-        langflow_status = await check_service(f"{settings.OPENRAG_API_URL}/health")
-        
-        # Verificar OpenSearch
-        opensearch_status = await check_service(f"{settings.OPENSEARCH_URL}/_cluster/health")
-        
-        # Verificar Redis (simplificado)
-        try:
-            # TODO: Implementar verificação real do Redis
-            redis_status = True
-        except:
-            redis_status = False
-        
-        openrag_status = langflow_status and opensearch_status
-    else:
-        # Modo legado - sempre true
-        openrag_status = True
-    
-    # Status geral
-    overall = openrag_status if settings.USE_OPENRAG else True
-    
-    return HealthStatus(
-        status="healthy" if overall else "degraded",
-        version=settings.VERSION,
-        timestamp=datetime.now(),
-        openrag=openrag_status,
-        opensearch=opensearch_status,
-        langflow=langflow_status,
-        redis=redis_status,
-        overall=overall
-    )
+    """Comprehensive health check — returns status of all subsystems."""
+    uptime_s = round(time.time() - _start_time)
+
+    llm = _check_llm()
+    vector = _check_vector_store()
+    db = _check_database()
+    catalog = _check_catalog()
+
+    auth_ok = bool(settings.SECRET_KEY)
+
+    checks = {
+        "llm": llm["available"],
+        "vector_store": vector["available"],
+        "database": db["available"],
+        "catalog": catalog["available"],
+        "auth_configured": auth_ok,
+    }
+    all_ok = all(checks.values())
+
+    return {
+        "status": "healthy" if all_ok else "degraded",
+        "version": "4.0.0",
+        "environment": settings.ENVIRONMENT,
+        "uptime_seconds": uptime_s,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "checks": checks,
+        "details": {
+            "llm": llm,
+            "vector_store": vector,
+            "database": db,
+            "catalog": catalog,
+            "auth": {"secret_key_set": auth_ok, "require_auth": settings.REQUIRE_AUTH},
+        },
+    }
 
 
 @router.get("/ping")
 async def ping():
-    """Ping simples"""
-    return {"status": "pong", "timestamp": datetime.now()}
+    """Liveness probe — lightweight, no subsystem checks."""
+    return {"status": "pong", "timestamp": datetime.now(timezone.utc).isoformat()}

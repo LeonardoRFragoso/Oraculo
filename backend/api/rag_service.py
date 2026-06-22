@@ -9,8 +9,8 @@ import pickle
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
-from sentence_transformers import SentenceTransformer
 import faiss
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +27,11 @@ class RAGService:
         self.documents_file = self.storage_dir / "documents.pkl"
         self.metadata_file = self.storage_dir / "metadata.pkl"
         
-        # Modelo de embeddings
-        logger.info("Carregando modelo de embeddings...")
-        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.embedding_dim = 384  # Dimensão do modelo all-MiniLM-L6-v2
+        # Modelo de embeddings via OpenAI
+        logger.info("Configurando OpenAI Embeddings...")
+        self._openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+        self._embedding_model_name = "text-embedding-3-small"
+        self.embedding_dim = 1536  # Dimensão do text-embedding-3-small
         
         # Vector store (FAISS)
         self.index = None
@@ -105,8 +106,8 @@ class RAGService:
         chunks = self._chunk_text(content, chunk_size)
         logger.info(f"Documento dividido em {len(chunks)} chunks")
         
-        # Gerar embeddings
-        embeddings = self.embedding_model.encode(chunks, show_progress_bar=False)
+        # Gerar embeddings via OpenAI
+        embeddings = self._get_embeddings(chunks)
         embeddings = np.array(embeddings).astype('float32')
         
         # Adicionar ao índice FAISS
@@ -189,9 +190,8 @@ class RAGService:
         logger.info(f"🔍 Buscando por: '{query[:100]}...'")
         logger.info(f"📚 Total de documentos no índice: {len(self.documents)}")
         
-        # Gerar embedding da query
-        query_embedding = self.embedding_model.encode([query])
-        query_embedding = np.array(query_embedding).astype('float32')
+        # Gerar embedding da query via OpenAI
+        query_embedding = np.array(self._get_embeddings([query])).astype('float32')
         
         # Buscar no FAISS
         k = min(top_k, len(self.documents))
@@ -221,6 +221,14 @@ class RAGService:
         
         return results
     
+    def _get_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """Gera embeddings usando OpenAI text-embedding-3-small"""
+        response = self._openai_client.embeddings.create(
+            model=self._embedding_model_name,
+            input=texts
+        )
+        return [item.embedding for item in response.data]
+
     def get_stats(self) -> Dict[str, Any]:
         """Retorna estatísticas do índice"""
         return {
