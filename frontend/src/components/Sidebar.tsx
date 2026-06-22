@@ -1,4 +1,4 @@
-import { MessageSquare, BarChart3, Upload, Trash2, Plus, History } from 'lucide-react'
+import { MessageSquare, BarChart3, Upload, Trash2, Plus, Database, Bell, Share2 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useChat } from '../contexts/ChatContext'
 import { useState } from 'react'
@@ -16,8 +16,11 @@ export default function Sidebar() {
   const isActive = (path: string) => location.pathname === path
 
   const navItems = [
-    { path: '/', icon: MessageSquare, label: 'Chat' },
-    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { path: '/chat', icon: MessageSquare, label: 'Chat' },
+    { path: '/sources', icon: Database, label: 'Fontes de Dados' },
+    { path: '/analytics', icon: BarChart3, label: 'AI Analyst' },
+    { path: '/alerts', icon: Bell, label: 'Alertas & Ações' },
+    { path: '/graph', icon: Share2, label: 'Knowledge Graph' },
   ]
 
   const handleNewChat = () => {
