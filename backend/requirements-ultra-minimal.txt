@@ -1,0 +1,44 @@
+# Oráculo API - Ultra minimal (sem torch/sentence-transformers)
+
+# FastAPI e servidor
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Validação de dados
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# HTTP client
+httpx==0.26.0
+
+# Autenticação JWT
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Variáveis de ambiente
+python-dotenv==1.0.0
+
+# OpenAI (embeddings + chat)
+openai>=1.0.0
+
+# Processamento de arquivos e dados
+pandas>=2.0.0
+openpyxl>=3.0.0
+numpy>=1.24.0
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+
+# Vector store (sem torch)
+faiss-cpu>=1.7.0
+
+# Utilitários
+python-dateutil>=2.8.0
+
+# Sprint 1 — Universal Connectors
+sqlalchemy>=2.0.0          # DB abstraction layer (PostgreSQL, MySQL)
+pyarrow>=14.0.0            # Parquet support
+psycopg2-binary>=2.9.0     # PostgreSQL driver
+pymysql>=1.1.0             # MySQL/MariaDB driver
+duckdb>=0.10.0             # In-memory SQL for file sources (CSV, Excel, Parquet)
+anthropic>=0.40.0          # Claude LLM (primary provider)
