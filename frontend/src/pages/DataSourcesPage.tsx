@@ -26,6 +26,7 @@ export default function DataSourcesPage() {
   const [connecting, setConnecting] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
@@ -50,11 +51,24 @@ export default function DataSourcesPage() {
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Remover "${name}"?`)) return
+    setDeletingIds(prev => new Set(prev).add(id))
     try {
       await deleteDataSource(id)
       toast.success('Fonte removida')
       setSources(s => s.filter(x => x.id !== id))
-    } catch { toast.error('Erro ao remover') }
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        setSources(s => s.filter(x => x.id !== id))
+      } else {
+        toast.error('Erro ao remover')
+      }
+    } finally {
+      setDeletingIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
   }
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,6 +137,7 @@ export default function DataSourcesPage() {
                 onToggle={() => setExpanded(expanded === src.id ? null : src.id)}
                 onConnect={() => handleConnect(src.id)}
                 onDelete={() => handleDelete(src.id, src.name)}
+                isDeleting={deletingIds.has(src.id)}
               />
             ))}
           </div>
@@ -136,8 +151,8 @@ export default function DataSourcesPage() {
   )
 }
 
-function SourceCard({ source, isConnecting, expanded, onToggle, onConnect, onDelete }: {
-  source: DataSource; isConnecting: boolean; expanded: boolean
+function SourceCard({ source, isConnecting, isDeleting, expanded, onToggle, onConnect, onDelete }: {
+  source: DataSource; isConnecting: boolean; isDeleting: boolean; expanded: boolean
   onToggle: () => void; onConnect: () => void; onDelete: () => void
 }) {
   const icon = TYPE_ICONS[source.connector_type] || '🔌'
@@ -204,9 +219,10 @@ function SourceCard({ source, isConnecting, expanded, onToggle, onConnect, onDel
           </button>
           <button
             onClick={onDelete}
-            className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"
+            disabled={isDeleting}
+            className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Trash2 className="w-4 h-4" />
+            {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
           </button>
         </div>
       </div>
