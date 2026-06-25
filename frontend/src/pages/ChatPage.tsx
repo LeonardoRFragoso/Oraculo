@@ -7,11 +7,11 @@ import TypingIndicator from '../components/TypingIndicator'
 import WelcomeMessage from '../components/WelcomeMessage'
 import QuickActions from '../components/QuickActions'
 import AttachedFiles from '../components/AttachedFiles'
-import { sendMessage, listDataSources, DataSource } from '../services/api'
+import { sendMessage, listDataSources, getConversationHistory, DataSource } from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function ChatPage() {
-  const { messages, isLoading, conversationId, addMessage, setIsLoading, setConversationId } = useChat()
+  const { messages, isLoading, conversationId, addMessage, setIsLoading, setConversationId, setMessages } = useChat()
   const [input, setInput] = useState('')
   const [sources, setSources] = useState<DataSource[]>([])
   const [selectedSourceId, setSelectedSourceId] = useState<string>('')
@@ -39,6 +39,23 @@ export default function ChatPage() {
       }
     })
   }, [searchParams])
+
+  useEffect(() => {
+    if (!conversationId) {
+      setMessages([])
+      return
+    }
+    getConversationHistory(conversationId)
+      .then(history => {
+        setMessages(history.map((m, index) => ({
+          id: `${conversationId}-${index}`,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.timestamp),
+        })))
+      })
+      .catch(() => toast.error('Erro ao carregar histórico'))
+  }, [conversationId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

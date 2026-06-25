@@ -11,6 +11,7 @@ export interface ChatContextType {
   isLoading: boolean
   conversationId: string | null
   addMessage: (message: Message) => void
+  setMessages: (messages: Message[]) => void
   clearMessages: () => void
   updateLastMessage: (content: string) => void
   setIsLoading: (loading: boolean) => void

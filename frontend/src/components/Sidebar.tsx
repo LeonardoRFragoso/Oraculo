@@ -1,5 +1,5 @@
-import { MessageSquare, BarChart3, Upload, Trash2, Plus, Database, Bell, Share2, Cpu } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { MessageSquare, BarChart3, Upload, Trash2, Plus, Database, Bell, Share2, Cpu, History } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useChat } from '../contexts/ChatContext'
 import { useState } from 'react'
 import { uploadFile } from '../services/api'
@@ -8,6 +8,7 @@ import ConversationList from './ConversationList'
 
 export default function Sidebar() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { clearMessages, messages, conversationId, setConversationId } = useChat()
   const [showUpload, setShowUpload] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -26,9 +27,11 @@ export default function Sidebar() {
 
   const handleNewChat = () => {
     if (messages.length > 0) {
-      if (confirm('Iniciar nova conversa? A conversa atual será perdida.')) {
+      if (confirm('Iniciar nova conversa? A conversa atual será salva no histórico.')) {
         clearMessages()
       }
+    } else {
+      clearMessages()
     }
   }
 
@@ -121,13 +124,29 @@ export default function Sidebar() {
         )}
       </div>
 
+      {/* History Toggle */}
+      <div className="p-4 border-t border-light-border dark:border-dark-border">
+        <button
+          onClick={() => setShowHistory(!showHistory)}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+            showHistory
+              ? 'bg-primary text-white'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-bg'
+          }`}
+        >
+          <History className="w-5 h-5" />
+          <span className="font-medium">{showHistory ? 'Ocultar histórico' : 'Histórico'}</span>
+        </button>
+      </div>
+
       {/* Conversation History */}
       {showHistory && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
           <ConversationList
             onSelectConversation={(id) => {
               setConversationId(id)
               setShowHistory(false)
+              navigate('/chat')
             }}
             currentConversationId={conversationId || undefined}
           />
@@ -149,14 +168,14 @@ export default function Sidebar() {
         <div className="p-4 border-t border-light-border dark:border-dark-border">
           <button
             onClick={() => {
-              if (confirm('Limpar histórico de chat?')) {
+              if (confirm('Limpar tela do chat? A conversa continua salva no histórico.')) {
                 clearMessages()
               }
             }}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
           >
             <Trash2 className="w-4 h-4" />
-            <span className="text-sm font-medium">Limpar Chat</span>
+            <span className="text-sm font-medium">Limpar tela</span>
           </button>
         </div>
       )}

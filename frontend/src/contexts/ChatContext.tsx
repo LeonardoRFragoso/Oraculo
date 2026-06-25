@@ -12,9 +12,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages(prev => [...prev, message])
   }
 
+  const setMessagesList = (messages: Message[]) => {
+    setMessages(messages)
+  }
+
   const clearMessages = () => {
     setMessages([])
-    setConversationId(new Date().toISOString())
+    setConversationId(null)
   }
 
   const updateLastMessage = (content: string) => {
@@ -34,6 +38,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         isLoading,
         conversationId,
         addMessage,
+        setMessages: setMessagesList,
         clearMessages,
         updateLastMessage,
         setIsLoading,
