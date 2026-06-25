@@ -10,8 +10,23 @@ import time
 from typing import Callable
 
 from core.logging_config import new_trace_id, set_trace_id
+from .config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _add_cors_headers(request: Request, response: Response) -> None:
+    """Adiciona headers CORS em respostas geradas antes do CORSMiddleware.
+
+    O AuthMiddleware é um BaseHTTPMiddleware que pode retornar 401 antes de o
+    CORSMiddleware conseguir injetar os headers. Isso evita que o navegador
+    oculte o 401 com uma mensagem de CORS.
+    """
+    origin = request.headers.get("origin")
+    if origin and origin in settings.CORS_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
@@ -66,11 +81,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
-            return Response(
+            resp = Response(
                 content='{"detail":"Token de autenticação não fornecido"}',
                 status_code=401,
                 media_type="application/json",
             )
+            _add_cors_headers(request, resp)
+            return resp
 
         token = auth_header[len("Bearer "):]
         try:
@@ -83,11 +100,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.username = payload.get("sub")
         except Exception as e:
             logger.warning(f"Auth falhou para {request.url.path}: {e}")
-            return Response(
+            resp = Response(
                 content=f'{{"detail":"Token inválido ou expirado"}}',
                 status_code=401,
                 media_type="application/json",
             )
+            _add_cors_headers(request, resp)
+            return resp
 
         return await call_next(request)
 

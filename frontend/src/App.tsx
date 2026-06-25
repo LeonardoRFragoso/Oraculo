@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage'
 import DataSourcesPage from './pages/DataSourcesPage'
 import AlertsPage from './pages/AlertsPage'
 import GraphPage from './pages/GraphPage'
+import ModelsPage from './pages/ModelsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
                 <Route path="alerts" element={<AlertsPage />} />
                 <Route path="graph" element={<GraphPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="models" element={<ModelsPage />} />
               </Route>
             </Routes>
           </Router>

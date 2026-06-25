@@ -12,19 +12,22 @@ from typing import List, Optional
 import os
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente o mais cedo possível — routers e LLMClient
+# precisam delas durante a importação dos módulos.
+# Usamos o .env na raiz do projeto (pai de backend/).
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 # Ensure backend root is on path so connectors/ and catalog/ are importable
 _backend_root = str(Path(__file__).parent.parent)
 if _backend_root not in sys.path:
     sys.path.insert(0, _backend_root)
 
-from .routers import chat, analytics, files, health, auth, datasources, query
+from .routers import chat, analytics, files, health, auth, datasources, query, models
 from .config import settings
 from .middleware import LoggingMiddleware, AuthMiddleware, TraceMiddleware
-
-# Carregar variáveis de ambiente
-load_dotenv()
 
 # Structured logging
 from core.logging_config import setup_logging
@@ -77,7 +80,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configurar CORS
+# Configurar CORS primeiro — deve envolver todos os outros middlewares,
+# incluindo o AuthMiddleware, para que headers CORS sejam adicionados
+# mesmo em respostas 401/403.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -87,7 +92,7 @@ app.add_middleware(
 )
 
 # Adicionar middlewares customizados
-app.add_middleware(TraceMiddleware)   # outermost — sets trace_id first
+app.add_middleware(TraceMiddleware)   # sets trace_id first
 app.add_middleware(LoggingMiddleware)
 if settings.REQUIRE_AUTH:
     app.add_middleware(AuthMiddleware)
@@ -100,6 +105,7 @@ app.include_router(analytics.router, prefix="/api", tags=["Analytics"])
 app.include_router(files.router, prefix="/api", tags=["Files"])
 app.include_router(datasources.router, prefix="/api", tags=["Data Sources"])
 app.include_router(query.router, prefix="/api", tags=["Query"])
+app.include_router(models.router, prefix="/api", tags=["Models"])
 
 
 @app.get("/")

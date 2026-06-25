@@ -25,12 +25,36 @@ _start_time = time.time()
 def _check_llm() -> Dict[str, Any]:
     anthropic_key = bool(os.getenv("ANTHROPIC_API_KEY", "").startswith("sk-ant-"))
     openai_key = bool(os.getenv("OPENAI_API_KEY", "").startswith("sk-"))
-    provider = "anthropic" if anthropic_key else ("openai" if openai_key else None)
+    opencode_key = bool(os.getenv("OPENCODE_API_KEY", ""))
+    zai_key = bool(os.getenv("ZAI_API_KEY", ""))
+    provider_pref = os.getenv("LLM_PROVIDER", "auto")
+
+    if provider_pref == "anthropic" and anthropic_key:
+        provider = "anthropic"
+    elif provider_pref == "openai" and openai_key:
+        provider = "openai"
+    elif provider_pref == "opencode" and opencode_key:
+        provider = "opencode"
+    elif provider_pref == "zai" and zai_key:
+        provider = "zai"
+    elif anthropic_key:
+        provider = "anthropic"
+    elif openai_key:
+        provider = "openai"
+    elif opencode_key:
+        provider = "opencode"
+    elif zai_key:
+        provider = "zai"
+    else:
+        provider = None
+
     return {
-        "available": provider is not None,
+        "available": provider is not None and provider != "none",
         "provider": provider or "none",
         "anthropic_key_set": anthropic_key,
         "openai_key_set": openai_key,
+        "opencode_key_set": opencode_key,
+        "zai_key_set": zai_key,
     }
 
 

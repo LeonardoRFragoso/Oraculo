@@ -45,7 +45,16 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4-turbo"
     OPENAI_MAX_TOKENS: int = 4000
     OPENAI_TEMPERATURE: float = 0.7
-    
+
+    # OpenCode Zen (OpenAI-compatible endpoint)
+    OPENCODE_API_KEY: str = os.getenv("OPENCODE_API_KEY", "")
+    OPENCODE_BASE_URL: str = os.getenv("OPENCODE_BASE_URL", "https://opencode.ai/zen/v1")
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "auto")
+
+    # Z.AI (OpenAI-compatible endpoint)
+    ZAI_API_KEY: str = os.getenv("ZAI_API_KEY", "")
+    ZAI_BASE_URL: str = os.getenv("ZAI_BASE_URL", "https://api.z.ai/api/paas/v4")
+
     # OpenRAG
     USE_OPENRAG: bool = os.getenv("USE_OPENRAG", "false").lower() == "true"
     OPENRAG_API_URL: str = os.getenv("OPENRAG_API_URL", "http://localhost:7860")

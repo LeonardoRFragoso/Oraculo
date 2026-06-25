@@ -11,7 +11,7 @@ interface HealthData {
   uptime_seconds: number
   checks: Record<string, boolean>
   details: {
-    llm: { available: boolean; provider: string; anthropic_key_set: boolean; openai_key_set: boolean }
+    llm: { available: boolean; provider: string; anthropic_key_set: boolean; openai_key_set: boolean; opencode_key_set: boolean; zai_key_set: boolean }
     vector_store: { available: boolean; backend: string; indexed_sources: number }
     database: { available: boolean; backend: string }
     catalog: { available: boolean; total_sources: number; connected_sources: number }
@@ -146,6 +146,20 @@ export default function SettingsPage() {
                   <p className="text-sm text-gray-500 dark:text-gray-400">GPT-4o / text-embedding</p>
                 </div>
                 <StatusBadge ok={health?.details.llm.openai_key_set ?? false} label={health?.details.llm.openai_key_set ? 'Configurada' : 'Não configurada'} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">OpenCode Zen API Key</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Modelos gratuitos e pagos</p>
+                </div>
+                <StatusBadge ok={health?.details.llm.opencode_key_set ?? false} label={health?.details.llm.opencode_key_set ? 'Configurada' : 'Não configurada'} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Z.AI API Key</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">GLM-4.5 / GLM-5</p>
+                </div>
+                <StatusBadge ok={health?.details.llm.zai_key_set ?? false} label={health?.details.llm.zai_key_set ? 'Configurada' : 'Não configurada'} />
               </div>
               <div className="flex items-center justify-between">
                 <div>

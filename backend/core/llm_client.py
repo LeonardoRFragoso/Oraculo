@@ -1,10 +1,13 @@
 """
-Unified LLM Client — abstracts Anthropic Claude and OpenAI.
+Unified LLM Client — abstracts Anthropic Claude, OpenAI, OpenCode Zen and Z.AI.
 
 Priority:
   1. Anthropic Claude (if ANTHROPIC_API_KEY is set)
   2. OpenAI GPT (if OPENAI_API_KEY is set)
+  3. OpenCode Zen (if OPENCODE_API_KEY is set)
+  4. Z.AI (if ZAI_API_KEY is set)
 
+Use LLM_PROVIDER=opencode or LLM_PROVIDER=zai to force a provider.
 All NL2SQL, Semantic Engine, and Chat modules use this client.
 """
 
@@ -12,6 +15,8 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+
+from .model_config import active_model
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,11 @@ class LLMClient:
     """
     Drop-in LLM abstraction. Auto-selects provider based on env vars.
 
+    OpenCode Zen is exposed via the OpenAI-compatible endpoint
+    https://opencode.ai/zen/v1 using model ids like ``opencode/<model-id>``.
+
+    Z.AI is exposed via https://api.z.ai/api/paas/v4 using model ids like ``glm-4.5``.
+
     Usage:
         client = LLMClient()
         resp = client.chat(
@@ -43,12 +53,20 @@ class LLMClient:
 
     def __init__(
         self,
-        prefer: str = "auto",    # "auto" | "anthropic" | "openai"
+        prefer: str = "auto",    # "auto" | "anthropic" | "openai" | "opencode" | "zai"
         model_override: Optional[str] = None,
     ):
         self._anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
         self._openai_key = os.getenv("OPENAI_API_KEY", "")
-        self._prefer = prefer
+        self._opencode_key = os.getenv("OPENCODE_API_KEY", "")
+        self._opencode_base_url = os.getenv(
+            "OPENCODE_BASE_URL", "https://opencode.ai/zen/v1"
+        )
+        self._zai_key = os.getenv("ZAI_API_KEY", "")
+        self._zai_base_url = os.getenv(
+            "ZAI_BASE_URL", "https://api.z.ai/api/paas/v4"
+        )
+        self._prefer = os.getenv("LLM_PROVIDER", prefer)
         self._model_override = model_override
         self._provider = self._resolve_provider()
         logger.info(f"LLMClient initialized: provider={self._provider}")
@@ -58,13 +76,27 @@ class LLMClient:
             return "anthropic"
         if self._prefer == "openai" and self._openai_key:
             return "openai"
+        if self._prefer == "opencode" and self._opencode_key:
+            return "opencode"
+        if self._prefer == "zai" and self._zai_key:
+            return "zai"
         if self._anthropic_key:
             return "anthropic"
         if self._openai_key:
             return "openai"
-        raise RuntimeError(
-            "No LLM API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY in .env"
+        if self._opencode_key:
+            return "opencode"
+        if self._zai_key:
+            return "zai"
+        if self._prefer and self._prefer != "auto":
+            logger.warning(
+                f"LLM_PROVIDER={self._prefer} was requested but no matching key was found"
+            )
+        logger.warning(
+            "No LLM API key found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, "
+            "OPENCODE_API_KEY or ZAI_API_KEY in .env. Chat will be unavailable until then."
         )
+        return "none"
 
     @property
     def provider(self) -> str:
@@ -74,9 +106,15 @@ class LLMClient:
     def default_model(self) -> str:
         if self._model_override:
             return self._model_override
+        if active_model.get():
+            return active_model.get()
+        if self._provider == "none":
+            raise RuntimeError("No LLM provider configured.")
         return {
             "anthropic": "claude-haiku-4-5",  # fast + cheap for NL2SQL / routing
             "openai": "gpt-4o-mini",
+            "opencode": "opencode/deepseek-v4-flash-free",  # free, fast
+            "zai": "glm-4.5-flash",  # free, fast
         }[self._provider]
 
     @property
@@ -84,9 +122,15 @@ class LLMClient:
         """Larger model for complex reasoning tasks."""
         if self._model_override:
             return self._model_override
+        if active_model.get():
+            return active_model.get()
+        if self._provider == "none":
+            raise RuntimeError("No LLM provider configured.")
         return {
             "anthropic": "claude-haiku-4-5",   # use haiku for all tasks (low credit balance)
             "openai": "gpt-4o",
+            "opencode": "opencode/big-pickle",  # free, strong reasoning
+            "zai": "glm-4.5",  # strong reasoning
         }[self._provider]
 
     def chat(
@@ -111,8 +155,17 @@ class LLMClient:
             json_mode: Ask the model to respond with valid JSON.
             model: Override the default model for this call.
         """
+        if self._provider == "none":
+            raise RuntimeError(
+                "No LLM provider configured. "
+                "Set ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENCODE_API_KEY or ZAI_API_KEY in .env"
+            )
         if self._provider == "anthropic":
             return self._anthropic_chat(user, system, history, max_tokens, temperature, json_mode, model)
+        if self._provider == "opencode":
+            return self._opencode_chat(user, system, history, max_tokens, temperature, json_mode, model)
+        if self._provider == "zai":
+            return self._zai_chat(user, system, history, max_tokens, temperature, json_mode, model)
         return self._openai_chat(user, system, history, max_tokens, temperature, json_mode, model)
 
     # ------------------------------------------------------------------
@@ -178,12 +231,73 @@ class LLMClient:
     def _openai_chat(
         self, user, system, history, max_tokens, temperature, json_mode, model
     ) -> LLMResponse:
+        return self._openai_compatible_chat(
+            user,
+            system,
+            history,
+            max_tokens,
+            temperature,
+            json_mode,
+            model,
+            api_key=self._openai_key,
+            base_url=None,
+            provider="openai",
+        )
+
+    def _opencode_chat(
+        self, user, system, history, max_tokens, temperature, json_mode, model
+    ) -> LLMResponse:
+        return self._openai_compatible_chat(
+            user,
+            system,
+            history,
+            max_tokens,
+            temperature,
+            json_mode,
+            model,
+            api_key=self._opencode_key,
+            base_url=self._opencode_base_url,
+            provider="opencode",
+        )
+
+    def _zai_chat(
+        self, user, system, history, max_tokens, temperature, json_mode, model
+    ) -> LLMResponse:
+        return self._openai_compatible_chat(
+            user,
+            system,
+            history,
+            max_tokens,
+            temperature,
+            json_mode,
+            model,
+            api_key=self._zai_key,
+            base_url=self._zai_base_url,
+            provider="zai",
+        )
+
+    def _openai_compatible_chat(
+        self,
+        user,
+        system,
+        history,
+        max_tokens,
+        temperature,
+        json_mode,
+        model,
+        api_key,
+        base_url,
+        provider,
+    ) -> LLMResponse:
         try:
             from openai import OpenAI
         except ImportError:
             raise RuntimeError("openai not installed. Run: pip install openai")
 
-        client = OpenAI(api_key=self._openai_key)
+        client_kwargs: Dict[str, Any] = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        client = OpenAI(**client_kwargs)
         chosen_model = model or self.default_model
 
         messages = []
@@ -205,10 +319,13 @@ class LLMClient:
         response = client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content
 
+        if json_mode and content is not None:
+            content = self._strip_markdown_fences(content)
+
         return LLMResponse(
             content=content,
             model=chosen_model,
-            provider="openai",
+            provider=provider,
             input_tokens=response.usage.prompt_tokens,
             output_tokens=response.usage.completion_tokens,
             raw=response,

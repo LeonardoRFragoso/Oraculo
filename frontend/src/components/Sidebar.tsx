@@ -1,4 +1,4 @@
-import { MessageSquare, BarChart3, Upload, Trash2, Plus, Database, Bell, Share2 } from 'lucide-react'
+import { MessageSquare, BarChart3, Upload, Trash2, Plus, Database, Bell, Share2, Cpu } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useChat } from '../contexts/ChatContext'
 import { useState } from 'react'
@@ -21,6 +21,7 @@ export default function Sidebar() {
     { path: '/analytics', icon: BarChart3, label: 'AI Analyst' },
     { path: '/alerts', icon: Bell, label: 'Alertas & Ações' },
     { path: '/graph', icon: Share2, label: 'Knowledge Graph' },
+    { path: '/models', icon: Cpu, label: 'Modelos' },
   ]
 
   const handleNewChat = () => {
