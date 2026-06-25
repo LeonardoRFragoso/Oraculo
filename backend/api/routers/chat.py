@@ -88,7 +88,7 @@ async def chat(request: ChatRequest):
                     answer = result.answer
                     sources = list({
                         s.name for s in connected_sources
-                        if s.id in (result.source_ids or [])
+                        if s.id in (result.sources_used or [])
                     })
                 except Exception as e:
                     logger.warning(f"Hybrid retrieval failed, falling back to LLM: {e}")
