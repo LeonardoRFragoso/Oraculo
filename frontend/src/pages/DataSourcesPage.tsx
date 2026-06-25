@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Database, Upload, Plus, Zap, Trash2, RefreshCw,
   CheckCircle, XCircle, Clock, ChevronDown, ChevronRight,
-  Table, BarChart2
+  Table, BarChart2, MessageSquare
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -21,6 +22,7 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 export default function DataSourcesPage() {
+  const navigate = useNavigate()
   const [sources, setSources] = useState<DataSource[]>([])
   const [loading, setLoading] = useState(true)
   const [connecting, setConnecting] = useState<string | null>(null)
@@ -44,7 +46,7 @@ export default function DataSourcesPage() {
     try {
       await connectDataSource(id)
       toast.success('Fonte conectada e analisada!')
-      load()
+      navigate(`/analytics?source=${id}`)
     } catch { toast.error('Erro ao conectar fonte') }
     finally { setConnecting(null) }
   }
@@ -138,6 +140,7 @@ export default function DataSourcesPage() {
                 onConnect={() => handleConnect(src.id)}
                 onDelete={() => handleDelete(src.id, src.name)}
                 isDeleting={deletingIds.has(src.id)}
+                onChat={() => navigate(`/chat?source=${src.id}`)}
               />
             ))}
           </div>
@@ -151,9 +154,9 @@ export default function DataSourcesPage() {
   )
 }
 
-function SourceCard({ source, isConnecting, isDeleting, expanded, onToggle, onConnect, onDelete }: {
+function SourceCard({ source, isConnecting, isDeleting, expanded, onToggle, onConnect, onDelete, onChat }: {
   source: DataSource; isConnecting: boolean; isDeleting: boolean; expanded: boolean
-  onToggle: () => void; onConnect: () => void; onDelete: () => void
+  onToggle: () => void; onConnect: () => void; onDelete: () => void; onChat: () => void
 }) {
   const icon = TYPE_ICONS[source.connector_type] || '🔌'
   const statusColor = STATUS_COLOR[source.status] || 'text-gray-400'
@@ -209,6 +212,15 @@ function SourceCard({ source, isConnecting, isDeleting, expanded, onToggle, onCo
                 ? <RefreshCw className="w-3 h-3 animate-spin" />
                 : <RefreshCw className="w-3 h-3" />}
               Re-analisar
+            </button>
+          )}
+          {source.status === 'connected' && (
+            <button
+              onClick={onChat}
+              className="p-2 rounded-lg hover:bg-primary/10 text-primary"
+              title="Perguntar sobre esta fonte"
+            >
+              <MessageSquare className="w-4 h-4" />
             </button>
           )}
           <button

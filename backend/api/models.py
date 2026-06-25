@@ -36,6 +36,7 @@ class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000, description="Pergunta do usuário")
     conversation_id: Optional[str] = Field(None, description="ID da conversa")
     context: Optional[Dict[str, Any]] = Field(None, description="Contexto adicional")
+    source_ids: Optional[List[str]] = Field(None, description="IDs das fontes de dados a serem usadas")
     
     @validator('query')
     def query_not_empty(cls, v):

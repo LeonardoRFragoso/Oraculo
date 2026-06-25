@@ -1,17 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Sparkles } from 'lucide-react'
+import { Send, Sparkles, Database } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { useChat } from '../contexts/ChatContext'
 import ChatMessage from '../components/ChatMessage'
 import TypingIndicator from '../components/TypingIndicator'
 import WelcomeMessage from '../components/WelcomeMessage'
 import QuickActions from '../components/QuickActions'
 import AttachedFiles from '../components/AttachedFiles'
-import { sendMessage } from '../services/api'
+import { sendMessage, listDataSources, DataSource } from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function ChatPage() {
   const { messages, isLoading, conversationId, addMessage, setIsLoading, setConversationId } = useChat()
   const [input, setInput] = useState('')
+  const [sources, setSources] = useState<DataSource[]>([])
+  const [selectedSourceId, setSelectedSourceId] = useState<string>('')
+  const [searchParams, setSearchParams] = useSearchParams()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -22,6 +26,19 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    listDataSources().then(data => {
+      const connected = data.filter(s => s.status === 'connected')
+      setSources(connected)
+      const paramId = searchParams.get('source')
+      if (paramId && connected.some(s => s.id === paramId)) {
+        setSelectedSourceId(paramId)
+      } else {
+        setSelectedSourceId('')
+      }
+    })
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,8 +56,16 @@ export default function ChatPage() {
     setIsLoading(true)
 
     try {
-      const response = await sendMessage(input.trim())
-      
+      const response = await sendMessage(
+        input.trim(),
+        conversationId || undefined,
+        selectedSourceId ? [selectedSourceId] : undefined
+      )
+
+      if (response.conversation_id) {
+        setConversationId(response.conversation_id)
+      }
+
       const assistantMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant' as const,
@@ -117,6 +142,29 @@ export default function ChatPage() {
       {/* Input Area */}
       <div className="border-t border-light-border dark:border-dark-border bg-white dark:bg-dark-surface">
         <div className="max-w-4xl mx-auto p-4">
+          {sources.length > 0 && (
+            <div className="mb-3 flex items-center gap-2">
+              <Database className="w-4 h-4 text-primary" />
+              <select
+                className="input text-sm flex-1"
+                value={selectedSourceId}
+                onChange={e => {
+                  const id = e.target.value
+                  setSelectedSourceId(id)
+                  if (id) {
+                    setSearchParams({ source: id })
+                  } else {
+                    setSearchParams({})
+                  }
+                }}
+              >
+                <option value="">Todas as fontes conectadas</option>
+                {sources.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <AttachedFiles />
           <form onSubmit={handleSubmit} className="relative">
             <textarea

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import {
   Brain, RefreshCw, AlertTriangle,
-  TrendingUp, Zap, ChevronDown, ChevronRight, Database
+  TrendingUp, Zap, ChevronDown, ChevronRight, Database, MessageSquare
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { listDataSources, analyzeDataSource, AnalysisReport, DataSource } from '../services/api'
@@ -18,6 +19,8 @@ const SEV_COLOR: Record<string, string> = {
 }
 
 export default function AnalyticsPage() {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [sources, setSources] = useState<DataSource[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [report, setReport] = useState<AnalysisReport | null>(null)
@@ -28,9 +31,14 @@ export default function AnalyticsPage() {
     listDataSources().then(s => {
       const connected = s.filter(x => x.status === 'connected')
       setSources(connected)
-      if (connected.length > 0) setSelected(connected[0].id)
+      const paramId = searchParams.get('source')
+      if (paramId && connected.some(x => x.id === paramId)) {
+        setSelected(paramId)
+      } else if (connected.length > 0) {
+        setSelected(connected[0].id)
+      }
     })
-  }, [])
+  }, [searchParams])
 
   useEffect(() => {
     if (!selected) return
@@ -56,15 +64,26 @@ export default function AnalyticsPage() {
             </h1>
             <p className="text-sm text-gray-500 mt-1">Insights proativos gerados automaticamente</p>
           </div>
-          {sources.length > 1 && (
-            <select
-              className="input text-sm"
-              value={selected || ''}
-              onChange={e => setSelected(e.target.value)}
-            >
-              {sources.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          )}
+          <div className="flex items-center gap-2">
+            {selected && (
+              <button
+                onClick={() => navigate(`/chat?source=${selected}`)}
+                className="btn-primary flex items-center gap-2 text-sm"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Perguntar sobre a fonte
+              </button>
+            )}
+            {sources.length > 1 && (
+              <select
+                className="input text-sm"
+                value={selected || ''}
+                onChange={e => setSelected(e.target.value)}
+              >
+                {sources.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
+          </div>
         </div>
 
         {sources.length === 0 ? (

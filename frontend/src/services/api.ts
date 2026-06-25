@@ -20,11 +20,12 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-export async function sendMessage(query: string, conversationId?: string): Promise<ApiResponse> {
+export async function sendMessage(query: string, conversationId?: string, sourceIds?: string[]): Promise<ApiResponse> {
   try {
     const response = await api.post('/chat', { 
       query,
-      conversation_id: conversationId 
+      conversation_id: conversationId,
+      source_ids: sourceIds,
     })
     return response.data
   } catch (error) {

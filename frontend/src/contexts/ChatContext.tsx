@@ -1,17 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react'
 import { Message, ChatContextType } from '../types'
 
-interface ChatContextType {
-  messages: Message[]
-  isLoading: boolean
-  conversationId: string | null
-  addMessage: (message: Message) => void
-  clearMessages: () => void
-  setLoading: (loading: boolean) => void
-  updateLastMessage: (content: string) => void
-  setConversationId: (id: string | null) => void
-}
-
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
 export function ChatProvider({ children }: { children: ReactNode }) {
@@ -48,6 +37,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         clearMessages,
         updateLastMessage,
         setIsLoading,
+        setConversationId,
       }}
     >
       {children}

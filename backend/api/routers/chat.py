@@ -56,26 +56,30 @@ async def chat(request: ChatRequest):
         sources: List[str] = []
         query_type = "direct"
 
-        # Obter fontes conectadas
+        # Obter fontes conectadas e aplicar filtro opcional do frontend
         connected_sources = [
             s for s in _registry.list()
             if s.status in ("connected", "profiled", "analyzed")
         ]
+        selected_ids = set(request.source_ids or [])
+        active_sources = connected_sources if not selected_ids else [
+            s for s in connected_sources if s.id in selected_ids
+        ]
 
-        if connected_sources:
+        if active_sources:
             # Rotear pergunta
-            decision = _query_router.route(request.query, connected_sources)
+            decision = _query_router.route(request.query, active_sources)
             query_type = decision.query_type.value
             logger.info(f"Chat routed as '{query_type}' for: {request.query[:80]}")
 
             if decision.query_type in (QueryType.NL2SQL, QueryType.RAG, QueryType.HYBRID):
-                suggested = decision.suggested_sources or [s.id for s in connected_sources[:3]]
+                suggested = decision.suggested_sources or [s.id for s in active_sources[:3]]
                 struct_sources = [
-                    s for s in connected_sources
+                    s for s in active_sources
                     if s.id in suggested and s.connector_type not in ("pdf", "docx", "txt", "xml")
                 ]
                 doc_sources = [
-                    s for s in connected_sources
+                    s for s in active_sources
                     if s.id in suggested and s.connector_type in ("pdf", "docx", "txt", "xml")
                 ]
 
@@ -87,7 +91,7 @@ async def chat(request: ChatRequest):
                     )
                     answer = result.answer
                     sources = list({
-                        s.name for s in connected_sources
+                        s.name for s in active_sources
                         if s.id in (result.sources_used or [])
                     })
                 except Exception as e:
@@ -96,8 +100,8 @@ async def chat(request: ChatRequest):
         if not answer:
             # Fallback: LLM direto com contexto de fontes disponíveis
             ctx_hint = ""
-            if connected_sources:
-                names = ", ".join(s.name for s in connected_sources[:5])
+            if active_sources:
+                names = ", ".join(s.name for s in active_sources[:5])
                 ctx_hint = f"\n\nFontes de dados conectadas: {names}."
             resp = _llm.chat(
                 system=_FALLBACK_SYSTEM,

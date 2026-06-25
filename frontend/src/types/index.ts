@@ -9,15 +9,17 @@ export interface Message {
 export interface ChatContextType {
   messages: Message[]
   isLoading: boolean
-  conversationId: string
+  conversationId: string | null
   addMessage: (message: Message) => void
   clearMessages: () => void
   updateLastMessage: (content: string) => void
   setIsLoading: (loading: boolean) => void
+  setConversationId: (id: string | null) => void
 }
 
 export interface ApiResponse {
   response: string
+  conversation_id?: string
   insights?: Insight[]
   suggestions?: string[]
 }
