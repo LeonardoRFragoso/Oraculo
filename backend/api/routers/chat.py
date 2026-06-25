@@ -21,7 +21,7 @@ if str(_root) not in sys.path:
 
 from catalog.registry import DataSourceRegistry
 from nl2sql.router import QueryRouter, QueryType
-from rag.hybrid_retriever import HybridRetriever
+from rag.hybrid_retriever import HybridRetriever, HybridResult
 from core.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,7 @@ async def chat(request: ChatRequest):
         answer = ""
         sources: List[str] = []
         query_type = "direct"
+        hybrid_result: Optional[HybridResult] = None
 
         # Obter fontes conectadas e aplicar filtro opcional do frontend
         connected_sources = [
@@ -84,15 +85,15 @@ async def chat(request: ChatRequest):
                 ]
 
                 try:
-                    result = await _hybrid.retrieve(
+                    hybrid_result = await _hybrid.retrieve(
                         question=request.query,
                         structured_sources=struct_sources or None,
                         document_sources=doc_sources or None,
                     )
-                    answer = result.answer
+                    answer = hybrid_result.answer
                     sources = list({
                         s.name for s in active_sources
-                        if s.id in (result.sources_used or [])
+                        if s.id in (hybrid_result.sources_used or [])
                     })
                 except Exception as e:
                     logger.warning(f"Hybrid retrieval failed, falling back to LLM: {e}")
@@ -116,21 +117,8 @@ async def chat(request: ChatRequest):
             metadata={"query_type": query_type, "sources": sources}
         )
 
-        # Insight simples baseado em palavras-chave
-        insights: List[Insight] = []
-        _kw = answer.lower()
-        if any(w in _kw for w in ("crescimento", "aumento", "alta", "elevação")):
-            insights.append(Insight(
-                id=str(uuid.uuid4()), type=InsightType.TREND,
-                title="Tendência de Crescimento", description="Padrão de crescimento detectado na resposta.",
-                confidence=0.7,
-            ))
-        elif any(w in _kw for w in ("queda", "redução", "diminuição", "declínio")):
-            insights.append(Insight(
-                id=str(uuid.uuid4()), type=InsightType.ANOMALY,
-                title="Tendência de Queda", description="Padrão de queda detectado na resposta.",
-                confidence=0.7,
-            ))
+        # Insights baseados em dados reais (SQL ou documentos)
+        insights = _build_insights(hybrid_result)
 
         return ChatResponse(
             response=answer,
@@ -147,6 +135,81 @@ async def chat(request: ChatRequest):
     except Exception as e:
         logger.error(f"Chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro ao processar chat: {str(e)}")
+
+
+def _build_insights(result: Optional[HybridResult]) -> List[Insight]:
+    """Generate insights only from concrete data (SQL results or document chunks)."""
+    insights: List[Insight] = []
+    if not result:
+        return insights
+
+    sql_results = result.sql_results
+    if sql_results and sql_results.get("rows"):
+        rows = sql_results["rows"]
+        columns = sql_results.get("columns") or []
+        if not rows or not columns:
+            return insights
+
+        numeric_cols = []
+        for col in columns:
+            values = [r.get(col) for r in rows if r.get(col) is not None]
+            numeric_values = []
+            for v in values:
+                try:
+                    numeric_values.append(float(v))
+                except (ValueError, TypeError):
+                    break
+            if len(numeric_values) >= max(2, len(values) // 2):
+                numeric_cols.append((col, numeric_values))
+
+        for col, values in numeric_cols:
+            mean = sum(values) / len(values)
+            variance = sum((v - mean) ** 2 for v in values) / len(values)
+            std = variance ** 0.5
+            max_val = max(values)
+            min_val = min(values)
+
+            anomalies = [v for v in values if std > 0 and abs(v - mean) > 2 * std]
+            if anomalies:
+                insights.append(Insight(
+                    id=str(uuid.uuid4()),
+                    type=InsightType.ANOMALY,
+                    title=f"Anomalia detectada em {col}",
+                    description=f"Valores de {col} fora do padrão (média {mean:.2f}, desvio {std:.2f}).",
+                    confidence=0.75,
+                    data={"column": col, "anomalies": anomalies[:5], "mean": mean, "std": std},
+                ))
+            elif len(values) >= 2:
+                first, last = values[0], values[-1]
+                if last > first * 1.05:
+                    insights.append(Insight(
+                        id=str(uuid.uuid4()),
+                        type=InsightType.TREND,
+                        title=f"Crescimento em {col}",
+                        description=f"{col} subiu de {first:.2f} para {last:.2f}.",
+                        confidence=0.65,
+                        data={"column": col, "start": first, "end": last},
+                    ))
+                elif last < first * 0.95:
+                    insights.append(Insight(
+                        id=str(uuid.uuid4()),
+                        type=InsightType.ANOMALY,
+                        title=f"Queda em {col}",
+                        description=f"{col} caiu de {first:.2f} para {last:.2f}.",
+                        confidence=0.65,
+                        data={"column": col, "start": first, "end": last},
+                    ))
+                else:
+                    insights.append(Insight(
+                        id=str(uuid.uuid4()),
+                        type=InsightType.OPPORTUNITY,
+                        title=f"Variação em {col}",
+                        description=f"{col} varia entre {min_val:.2f} e {max_val:.2f} (média {mean:.2f}).",
+                        confidence=0.6,
+                        data={"column": col, "min": min_val, "max": max_val, "mean": mean},
+                    ))
+
+    return insights
 
 
 @router.get("/chat/history/{conversation_id}", response_model=List[ChatMessage])
