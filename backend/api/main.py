@@ -25,7 +25,7 @@ _backend_root = str(Path(__file__).parent.parent)
 if _backend_root not in sys.path:
     sys.path.insert(0, _backend_root)
 
-from .routers import chat, analytics, files, health, auth, datasources, query, models
+from .routers import chat, analytics, files, health, auth, datasources, query, models, export as export_router
 from .config import settings
 from .middleware import LoggingMiddleware, AuthMiddleware, TraceMiddleware
 
@@ -106,6 +106,7 @@ app.include_router(files.router, prefix="/api", tags=["Files"])
 app.include_router(datasources.router, prefix="/api", tags=["Data Sources"])
 app.include_router(query.router, prefix="/api", tags=["Query"])
 app.include_router(models.router, prefix="/api", tags=["Models"])
+app.include_router(export_router.router, prefix="/api", tags=["Export"])
 
 
 @app.get("/")

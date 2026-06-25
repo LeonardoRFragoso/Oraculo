@@ -3,7 +3,7 @@ import { ApiResponse, SystemStatus } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
@@ -30,6 +30,26 @@ export async function sendMessage(query: string, conversationId?: string, source
     return response.data
   } catch (error) {
     console.error('Error sending message:', error)
+    throw error
+  }
+}
+
+export interface ExportResponse {
+  download_url: string
+  filename: string
+  format: string
+}
+
+export async function exportChat(query: string, conversationId?: string, sourceIds?: string[]): Promise<ExportResponse> {
+  try {
+    const response = await api.post('/chat/export', {
+      query,
+      conversation_id: conversationId,
+      source_ids: sourceIds,
+    })
+    return response.data
+  } catch (error) {
+    console.error('Error exporting chat:', error)
     throw error
   }
 }

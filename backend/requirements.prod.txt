@@ -36,6 +36,7 @@ pyarrow>=14.0.0              # Parquet
 PyPDF2>=3.0.0
 python-docx>=0.8.11
 python-dateutil>=2.8.0
+fpdf2>=2.8.0                 # PDF export
 
 # ── Vector store ───────────────────────────────────────────────────────────────
 faiss-cpu>=1.7.0

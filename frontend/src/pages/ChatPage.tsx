@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Sparkles, Database } from 'lucide-react'
+import { Send, Sparkles, Database, Download } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useChat } from '../contexts/ChatContext'
 import ChatMessage from '../components/ChatMessage'
@@ -7,7 +7,8 @@ import TypingIndicator from '../components/TypingIndicator'
 import WelcomeMessage from '../components/WelcomeMessage'
 import QuickActions from '../components/QuickActions'
 import AttachedFiles from '../components/AttachedFiles'
-import { sendMessage, listDataSources, getConversationHistory, DataSource } from '../services/api'
+import { sendMessage, listDataSources, getConversationHistory, exportChat, DataSource } from '../services/api'
+import { api } from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function ChatPage() {
@@ -15,6 +16,8 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [sources, setSources] = useState<DataSource[]>([])
   const [selectedSourceId, setSelectedSourceId] = useState<string>('')
+  const [showExport, setShowExport] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -134,6 +137,34 @@ export default function ChatPage() {
     inputRef.current?.focus()
   }
 
+  const handleExport = async (format: string) => {
+    if (!selectedSourceId) {
+      toast.error('Selecione uma fonte de dados para exportar')
+      return
+    }
+    setExporting(true)
+    setShowExport(false)
+    try {
+      const query = `Gere um arquivo ${format.toUpperCase()} completo e atualizado com base na fonte de dados selecionada`
+      const result = await exportChat(query, conversationId || undefined, [selectedSourceId])
+      const fileResponse = await api.get(result.download_url, { responseType: 'blob' })
+      const blob = new Blob([fileResponse.data])
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', result.filename)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      toast.success(`Arquivo ${result.format.toUpperCase()} gerado`)
+    } catch {
+      toast.error('Erro ao gerar arquivo')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="h-full flex flex-col bg-light-bg dark:bg-dark-bg">
       {/* Chat Messages */}
@@ -183,6 +214,33 @@ export default function ChatPage() {
             </div>
           )}
           <AttachedFiles />
+
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              type="button"
+              onClick={() => setShowExport(!showExport)}
+              disabled={exporting || !selectedSourceId}
+              className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exporting ? <Sparkles className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {exporting ? 'Gerando...' : 'Exportar'}
+            </button>
+            {showExport && (
+              <div className="flex items-center gap-2">
+                {['html', 'pdf', 'md', 'txt'].map(fmt => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    onClick={() => handleExport(fmt)}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-primary/10 text-primary hover:bg-primary/20 font-medium uppercase"
+                  >
+                    {fmt}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <form onSubmit={handleSubmit} className="relative">
             <textarea
               ref={inputRef}
