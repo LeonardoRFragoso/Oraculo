@@ -80,9 +80,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configurar CORS primeiro — deve envolver todos os outros middlewares,
-# incluindo o AuthMiddleware, para que headers CORS sejam adicionados
-# mesmo em respostas 401/403.
+# Adicionar middlewares customizados (envolvidos pelo CORS)
+app.add_middleware(TraceMiddleware)
+app.add_middleware(LoggingMiddleware)
+if settings.REQUIRE_AUTH:
+    app.add_middleware(AuthMiddleware)
+
+# Configurar CORS por último — deve ser o middleware externo, envolvendo
+# todos os BaseHTTPMiddlewares. O AuthMiddleware adiciona headers CORS
+# manualmente em 401/403 como fallback.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -90,12 +96,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Adicionar middlewares customizados
-app.add_middleware(TraceMiddleware)   # sets trace_id first
-app.add_middleware(LoggingMiddleware)
-if settings.REQUIRE_AUTH:
-    app.add_middleware(AuthMiddleware)
 
 # Incluir routers
 app.include_router(health.router, prefix="/api", tags=["Health"])
