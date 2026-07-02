@@ -1,61 +1,39 @@
-# 🔮 Oráculo - Backend
+# 🔮 Oráculo — Backend
 
-Backend Python para o Oráculo - Sistema de análise de dados comerciais e logísticos com IA.
+Backend FastAPI do Oráculo — Plataforma Universal de Inteligência Corporativa.
 
 ---
 
 ## 🚀 Tecnologias
 
-- **Python 3.10+**
-- **Streamlit** - Interface web
-- **OpenAI GPT-4** - LLM
-- **OpenRAG** - RAG enterprise-grade
-- **OpenSearch** - Vector store
-- **Langflow** - Workflows visuais
-- **Docling** - Document parsing
-- **Redis** - Cache
-- **FastAPI** - API REST (opcional)
+- **Python 3.11+**
+- **FastAPI 0.109** — API REST assíncrona
+- **SQLAlchemy 2 + Alembic** — ORM e migrações (PostgreSQL / SQLite)
+- **DuckDB** — Engine SQL em memória para fontes de arquivo
+- **FAISS** — Vector store para Hybrid RAG
+- **NetworkX** — Knowledge Graph
+- **passlib bcrypt + python-jose** — JWT auth
+- **structlog** — Structured logging
+
+### LLM Providers (4 suportados)
+
+| Provider | Env Var | Endpoint |
+|---|---|---|
+| Anthropic Claude | `ANTHROPIC_API_KEY` | API nativa |
+| OpenAI GPT | `OPENAI_API_KEY` | API nativa |
+| OpenCode Zen | `OPENCODE_API_KEY` | `https://opencode.ai/zen/v1` |
+| Z.AI | `ZAI_API_KEY` | `https://api.z.ai/api/paas/v4` |
+
+Seleção automática por prioridade ou forçada via `LLM_PROVIDER`.
 
 ---
 
 ## 📦 Instalação
 
-### **Requisitos**
-
 ```bash
-# Python 3.10 ou superior
-python --version
-
-# pip atualizado
-pip install --upgrade pip
-```
-
-### **Instalação Básica**
-
-```bash
-# Instalar dependências
-pip install -r requirements.txt
-
-# Ou com OpenRAG
-pip install -r requirements-openrag.txt
-```
-
-### **Instalação Completa com OpenRAG**
-
-```bash
-# 1. Instalar dependências
-pip install -r requirements-openrag.txt
-
-# 2. Configurar ambiente
-cp ../.env.openrag.example ../.env
-nano ../.env  # Adicionar OPENAI_API_KEY
-
-# 3. Iniciar serviços OpenRAG
-cd ..
-docker-compose -f docker-compose.openrag.yml up -d
-
-# 4. Executar migração (se necessário)
-python scripts/migrate_to_openrag.py
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.prod.txt
 ```
 
 ---
@@ -64,91 +42,132 @@ python scripts/migrate_to_openrag.py
 
 ```
 backend/
-├── src/                        # Código fonte
-│   ├── advanced_llm.py        # LLM Manager (legado)
-│   ├── openrag_integration.py # OpenRAG Manager
-│   ├── auth.py                # Autenticação
-│   ├── config.py              # Configurações
-│   ├── data_ingestion.py      # Ingestão de dados
-│   ├── export_manager.py      # Exportação
-│   └── context_builder.py     # Construção de contexto
+├── api/                           # FastAPI app
+│   ├── main.py                   # Entry point, CORS, lifespan
+│   ├── config.py                 # Settings centralizadas
+│   ├── models.py                 # Pydantic schemas
+│   ├── middleware.py             # AuthMiddleware + TraceMiddleware
+│   ├── auth_service.py           # JWT, hash de senhas, users
+│   ├── dependencies.py           # Injeção de dependências
+│   ├── conversation_store.py     # Persistência de conversas
+│   ├── file_processor.py         # Processamento de uploads
+│   ├── llm_service.py            # Serviço LLM (legado, não usado pelo chat)
+│   ├── rag_service.py            # RAG legado (não usado pelo chat)
+│   └── routers/                  # Endpoints REST
+│       ├── auth.py               # POST /login, GET /me
+│       ├── chat.py               # Chat com QueryRouter + HybridRetriever
+│       ├── datasources.py        # CRUD de fontes, connect, analyze, act, graph
+│       ├── query.py              # Query universal (NL2SQL + RAG)
+│       ├── analytics.py          # Analytics e KPIs
+│       ├── files.py              # Upload e processamento de arquivos
+│       ├── export.py             # Exportação (CSV, Excel, PDF)
+│       ├── health.py             # Health check real
+│       └── models.py             # Lista e seleciona modelos LLM
 │
-├── api/                       # 🚀 API FastAPI
-│   ├── main.py               # Aplicação principal
-│   ├── config.py             # Configurações
-│   ├── models.py             # Modelos Pydantic
-│   ├── dependencies.py       # Injeção de dependências
-│   ├── middleware.py         # Middlewares
-│   └── routers/              # Routers organizados
-│       ├── chat.py
-│       ├── health.py
-│       ├── files.py
-│       └── analytics.py
+├── catalog/                       # Metadata Catalog
+│   ├── semantic_engine.py        # Classificação automática de domínio
+│   ├── schema_discovery.py       # Descoberta de schema
+│   ├── profiler.py               # Profiling estatístico
+│   ├── quality_scorer.py         # Score de qualidade A–F
+│   └── registry.py               # Registry de fontes
 │
-├── scripts/                   # Scripts de automação
-│   ├── setup_openrag.sh      # Setup automático OpenRAG
-│   ├── migrate_to_openrag.py # Migração de dados
-│   └── validate_openrag.py   # Validação pós-migração
+├── connectors/                    # Universal Connectors
+│   ├── base.py                   # Interface base
+│   ├── files/                    # CSV, Excel, JSON, Parquet, Document
+│   └── databases/                # PostgreSQL, MySQL, SQLite
 │
-├── tests/                     # Testes automatizados
-│   └── test_openrag_integration.py
+├── nl2sql/                        # Natural Language to SQL
+│   ├── engine.py                 # Geração de SQL via LLM
+│   ├── validator.py              # Validação de segurança (SQL injection)
+│   ├── executor.py               # Execução via DuckDB
+│   └── router.py                 # Roteamento de queries
 │
-├── run_api.py                # Script para iniciar API
-├── README.md                 # Documentação do backend
-├── API_README.md             # Documentação da API
-├── INSTALL_API.md            # Guia de instalação
-├── pytest.ini                # Configuração pytest
-├── requirements.txt          # Dependências básicas
-├── requirements-api.txt      # Dependências API
-├── requirements-api-minimal.txt # Dependências API mínimas
-├── documents.pkl             # Dados (legado)
-├── vector_index.faiss        # Índice FAISS (legado)
-├── encryption.key            # Chave de criptografia
-└── users.json                # Usuários
+├── rag/                           # Hybrid RAG
+│   ├── vector_store.py           # FAISS per-source
+│   ├── document_indexer.py       # Indexação de documentos
+│   └── hybrid_retriever.py       # Retrieval híbrido (vetorial + NL2SQL)
+│
+├── analyst/                       # AI Data Analyst
+│   ├── kpi_generator.py          # Geração automática de KPIs
+│   ├── anomaly_detector.py       # Detecção de anomalias
+│   └── insight_engine.py         # Executive summary + insights
+│
+├── actions/                       # Agent Actions
+│   ├── base.py                   # Interface de ações
+│   ├── planner.py                # Planejamento de ações via LLM
+│   ├── registry.py               # Registro de ações
+│   └── builtin/                  # Ações nativas
+│       ├── create_alert.py       # Criar alerta
+│       ├── generate_report.py    # Gerar relatório
+│       └── send_email.py         # Enviar e-mail
+│
+├── graph/                         # Knowledge Graph
+│   ├── entity_extractor.py       # Extração de entidades via LLM
+│   ├── relation_builder.py       # Construção de relações
+│   ├── knowledge_graph.py        # API do grafo
+│   └── graph_store.py            # Persistência (NetworkX)
+│
+├── core/                          # Core utilities
+│   ├── llm_client.py             # Cliente unificado (Anthropic/OpenAI/OpenCode/Z.AI)
+│   ├── model_config.py           # Modelo ativo persistido
+│   └── logging_config.py         # Structured logging
+│
+├── db/                            # Database
+│   ├── engine.py                 # SQLAlchemy async engine
+│   └── models.py                 # UserModel, DataSourceModel, AlertModel
+│
+├── alembic/                       # Migrações
+│   └── versions/                 # 0001_initial_schema
+│
+├── scripts/                       # Scripts
+│   └── migrate_json_to_pg.py     # Migra JSON legado → PostgreSQL
+│
+├── tests/                         # Testes (pytest)
+│   ├── conftest.py               # Fixtures (auth, CSV, Excel, app_client)
+│   ├── test_auth.py              # Hash, JWT, login, rotas protegidas
+│   ├── test_nl2sql.py            # SQLValidator, SQLExecutor, QueryRouter
+│   ├── test_connectors.py        # CSV, Excel, JSON, SemanticEngine
+│   ├── test_llm_client.py        # LLM client unificado
+│   └── test_models.py            # API de modelos
+│
+├── pytest.ini                     # asyncio_mode=auto, coverage 60%
+├── requirements.prod.txt          # Dependências consolidadas
+└── requirements.test.txt          # pytest-asyncio, httpx, aiosqlite
 ```
 
 ---
 
 ## 🚀 Executar
 
-### **API FastAPI (Recomendado)**
-
 ```bash
-# Executar API
-python run_api.py
-
-# OU com uvicorn
+# Desenvolvimento
+source venv/bin/activate
 uvicorn api.main:app --reload --port 5000
+
+# Ou via script
+python run_api.py
 ```
 
 Acessar:
 - **API:** http://localhost:5000
-- **Docs:** http://localhost:5000/docs
+- **Docs Swagger:** http://localhost:5000/docs
 - **ReDoc:** http://localhost:5000/redoc
 
 ---
 
-## 🔧 Configuração
+## 🔧 Variáveis de Ambiente
 
-### **Variáveis de Ambiente**
+Ver arquivo `.env.example` na raiz do projeto. Principais:
 
-Criar arquivo `.env` na raiz do projeto:
-
-```bash
-# OpenAI
-OPENAI_API_KEY=sk-...
-
-# OpenRAG
-USE_OPENRAG=true
-OPENRAG_API_URL=http://localhost:7860
-OPENSEARCH_URL=http://localhost:9200
-DOCLING_URL=http://localhost:5001
-REDIS_URL=redis://localhost:6379
-
-# Configurações
-OPENRAG_INDEX_NAME=gptracker_knowledge
-EMBEDDING_MODEL=text-embedding-3-large
-CHAT_MODEL=gpt-4-turbo
+```env
+SECRET_KEY=                    # Obrigatório (gerar com secrets.token_hex(32))
+ANTHROPIC_API_KEY=             # LLM provider 1
+OPENAI_API_KEY=                # LLM provider 2
+OPENCODE_API_KEY=              # LLM provider 3
+ZAI_API_KEY=                   # LLM provider 4
+LLM_PROVIDER=auto              # auto | anthropic | openai | opencode | zai
+DATABASE_URL=                  # PostgreSQL (produção) ou SQLite (dev)
+ENVIRONMENT=development        # development | production
 ```
 
 ---
@@ -156,191 +175,41 @@ CHAT_MODEL=gpt-4-turbo
 ## 🧪 Testes
 
 ```bash
-# Executar todos os testes
-pytest
-
-# Com cobertura
-pytest --cov=src --cov-report=html
-
-# Teste específico
-pytest tests/test_openrag_integration.py
-
-# Validar instalação OpenRAG
-python scripts/validate_openrag.py
+pip install -r requirements.test.txt
+pytest                              # Todos os testes
+pytest tests/test_auth.py           # Autenticação
+pytest tests/test_nl2sql.py         # NL2SQL
+pytest tests/test_connectors.py     # Connectors
+pytest tests/test_llm_client.py     # LLM client
+pytest --cov --cov-report=html      # Com cobertura
 ```
 
 ---
 
-## 📊 Módulos Principais
+## �️ Migrações (Alembic)
 
-### **1. OpenRAG Integration (`src/openrag_integration.py`)**
+```bash
+# Aplicar migrações
+alembic upgrade head
 
-```python
-from src.openrag_integration import HybridLLMManager
+# Criar nova migração
+alembic revision --autogenerate -m "descrição"
 
-# Criar manager
-manager = HybridLLMManager()
-
-# Adicionar documentos
-manager.ingest_documents(files=['data.xlsx'])
-
-# Buscar
-results = manager.search('containers em março')
-
-# Chat
-response = manager.chat('Quantos containers?')
-```
-
-### **2. Data Ingestion (`src/data_ingestion.py`)**
-
-```python
-from src.data_ingestion import DataIngestionManager
-
-# Processar arquivo
-manager = DataIngestionManager()
-df = manager.process_file('data.xlsx')
-```
-
-### **3. Config (`src/config.py`)**
-
-```python
-from src.config import OPENRAG_CONFIG, OPENAI_CONFIG
-
-# Acessar configurações
-api_url = OPENRAG_CONFIG['api_url']
-model = OPENAI_CONFIG['model']
+# Rollback
+alembic downgrade -1
 ```
 
 ---
 
-## 🔄 Migração para OpenRAG
+## � Arquitetura de Chat (v4)
 
-### **Passo a Passo**
+O chat (`api/routers/chat.py`) usa a arquitetura unificada:
 
-```bash
-# 1. Backup dos dados atuais
-cp documents.pkl documents.pkl.backup
-cp vector_index.faiss vector_index.faiss.backup
+1. **QueryRouter** — decide se a pergunta vai para NL2SQL (dados estruturados) ou RAG (documentos)
+2. **HybridRetriever** — executa retrieval híbrido combinando busca vetorial + NL2SQL
+3. **LLMClient** — gera a resposta final usando o provider ativo
 
-# 2. Iniciar serviços OpenRAG
-docker-compose -f ../docker-compose.openrag.yml up -d
-
-# 3. Executar migração
-python scripts/migrate_to_openrag.py
-
-# 4. Validar
-python scripts/validate_openrag.py
-
-# 5. Atualizar .env
-echo "USE_OPENRAG=true" >> ../.env
-```
-
----
-
-## 📝 Scripts Úteis
-
-### **Setup OpenRAG**
-
-```bash
-./scripts/setup_openrag.sh
-```
-
-### **Migração de Dados**
-
-```bash
-python scripts/migrate_to_openrag.py
-```
-
-### **Validação**
-
-```bash
-python scripts/validate_openrag.py
-```
-
----
-
-## 🐛 Troubleshooting
-
-### **Erro: ModuleNotFoundError**
-
-```bash
-# Reinstalar dependências
-pip install -r requirements-openrag.txt
-```
-
-### **Erro: OpenSearch connection refused**
-
-```bash
-# Verificar se OpenSearch está rodando
-docker ps | grep opensearch
-
-# Reiniciar serviços
-docker-compose -f ../docker-compose.openrag.yml restart
-```
-
-### **Erro: OPENAI_API_KEY not found**
-
-```bash
-# Adicionar ao .env
-echo "OPENAI_API_KEY=sk-..." >> ../.env
-```
-
----
-
-## 📚 Documentação
-
-- [Guia de Instalação](../docs/GUIA_INSTALACAO.md)
-- [Manual do Usuário](../docs/MANUAL_USUARIO.md)
-- [Quickstart OpenRAG](../docs/QUICKSTART_OPENRAG.md)
-- [Migration Plan](../docs/MIGRATION_PLAN.md)
-- [Branding Oráculo](../docs/ORACULO_BRANDING.md)
-
----
-
-## 🔒 Segurança
-
-- ✅ Nunca commitar `.env` com API keys
-- ✅ Usar variáveis de ambiente
-- ✅ Criptografar dados sensíveis
-- ✅ Validar inputs do usuário
-- ✅ Rate limiting em APIs
-
----
-
-## 📈 Performance
-
-### **Otimizações**
-
-- Cache de embeddings (Redis)
-- Busca híbrida (vetorial + keyword)
-- Reranking de resultados
-- Chunking semântico
-- Batch processing
-
-### **Métricas**
-
-- Tempo de resposta: < 100ms
-- Precisão (MRR): 0.85
-- Cache hit rate: > 70%
-- Throughput: 100 req/s
-
----
-
-## 🤝 Contribuindo
-
-```bash
-# 1. Fork o projeto
-# 2. Criar branch
-git checkout -b feature/nova-funcionalidade
-
-# 3. Commit
-git commit -m "Adiciona nova funcionalidade"
-
-# 4. Push
-git push origin feature/nova-funcionalidade
-
-# 5. Abrir Pull Request
-```
+Os módulos legados `llm_service.py` e `rag_service.py` **não são mais usados** pelo chat.
 
 ---
 
@@ -350,8 +219,4 @@ MIT
 
 ---
 
-**🔮 Oráculo Backend - Powered by OpenRAG**
-
-**Versão:** 3.0.0  
-**Python:** 3.10+  
-**Status:** ✅ Produção
+**🔮 Oráculo Backend v4.0** — FastAPI · Python 3.11+
