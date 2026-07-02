@@ -13,6 +13,7 @@ import AlertsPage from './pages/AlertsPage'
 import GraphPage from './pages/GraphPage'
 import ModelsPage from './pages/ModelsPage'
 import AdminPage from './pages/AdminPage'
+import PricingPage from './pages/PricingPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="models" element={<ModelsPage />} />
                 <Route path="admin" element={<AdminPage />} />
+                <Route path="pricing" element={<PricingPage />} />
               </Route>
             </Routes>
           </Router>

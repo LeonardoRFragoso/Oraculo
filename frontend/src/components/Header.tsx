@@ -1,7 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { Moon, Sun, Settings, Sparkles, LogOut, User } from 'lucide-react'
+import { Moon, Sun, Settings, Sparkles, LogOut, User, Zap, Crown } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
+
+const PLAN_BADGES: Record<string, { icon: typeof Sparkles; label: string; classes: string }> = {
+  free: { icon: Sparkles, label: 'Free', classes: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' },
+  premium: { icon: Zap, label: 'Premium', classes: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
+  enterprise: { icon: Crown, label: 'Enterprise', classes: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' },
+}
 
 export default function Header() {
   const { theme, toggleTheme } = useTheme()
@@ -31,11 +37,34 @@ export default function Header() {
         <div className="flex items-center gap-3">
           {/* User Info */}
           {user && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800">
-              <User className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {user.full_name || user.username}
-              </span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800">
+                <User className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {user.full_name || user.username}
+                </span>
+              </div>
+              {(() => {
+                const plan = user.plan || 'free'
+                const badge = PLAN_BADGES[plan] || PLAN_BADGES.free
+                const PlanIcon = badge.icon
+                if (plan === 'enterprise') {
+                  return (
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${badge.classes}`}>
+                      <PlanIcon className="w-3.5 h-3.5" /> {badge.label}
+                    </span>
+                  )
+                }
+                return (
+                  <Link
+                    to="/pricing"
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${badge.classes} hover:opacity-80 transition-opacity`}
+                    title="Fazer upgrade"
+                  >
+                    <PlanIcon className="w-3.5 h-3.5" /> {badge.label}
+                  </Link>
+                )
+              })()}
             </div>
           )}
 
