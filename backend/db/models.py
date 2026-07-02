@@ -58,6 +58,12 @@ class UserModel(TimestampMixin, Base):
     role = Column(String(32), default="user", nullable=False)  # admin | user | viewer
     is_active = Column(Boolean, default=True, nullable=False)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
+    # ── Plan / Quota ──────────────────────────────────────────
+    plan = Column(String(32), default="free", nullable=False)  # free | premium | enterprise
+    plan_expires_at = Column(DateTime(timezone=True), nullable=True)
+    llm_quota_monthly = Column(Integer, default=100, nullable=False)
+    llm_quota_used = Column(Integer, default=0, nullable=False)
+    quota_reset_at = Column(DateTime(timezone=True), nullable=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -101,6 +107,25 @@ class DataSourceModel(TimestampMixin, Base):
             "tags": self.tags or [],
             "config": {},  # Never expose config in API responses
         }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Alerts
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ──────────────────────────────────────────────────────────────────────────────
+# User Preferences (per-user LLM settings)
+# ──────────────────────────────────────────────────────────────────────────────
+
+class UserPreferenceModel(Base):
+    __tablename__ = "user_preferences"
+
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    active_provider = Column(String(32), default="auto", nullable=False)  # auto|anthropic|openai|opencode|zai
+    active_model = Column(String(128), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship("UserModel", backref="preference", lazy="select")
 
 
 # ──────────────────────────────────────────────────────────────────────────────

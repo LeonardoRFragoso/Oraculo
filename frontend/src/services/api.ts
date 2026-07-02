@@ -120,6 +120,7 @@ export interface User {
   full_name: string
   is_active: boolean
   is_admin: boolean
+  plan?: string
 }
 
 export interface AuthResponse {

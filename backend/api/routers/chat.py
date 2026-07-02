@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Optional
 import logging
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request as FastRequest
 
 from ..models import ChatRequest, ChatResponse, ChatMessage, Insight, InsightType
 from ..conversation_store import ConversationStore
@@ -23,6 +23,7 @@ from catalog.registry import DataSourceRegistry
 from nl2sql.router import QueryRouter, QueryType
 from rag.hybrid_retriever import HybridRetriever, HybridResult
 from core.llm_client import LLMClient
+from core.quota import check_and_increment_quota
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,7 +33,7 @@ conversation_store = ConversationStore()
 _registry = DataSourceRegistry()
 _query_router = QueryRouter()
 _hybrid = HybridRetriever()
-_llm = LLMClient()
+_llm = LLMClient()  # fallback global
 
 _FALLBACK_SYSTEM = (
     "Você é o Oráculo, assistente de inteligência corporativa. "
@@ -41,14 +42,58 @@ _FALLBACK_SYSTEM = (
 )
 
 
+async def _get_user_llm(request: FastRequest) -> LLMClient:
+    """Builds an LLMClient with the user's plan, model and provider from request.state."""
+    user_plan = getattr(request.state, "user_plan", "free")
+    user_id = getattr(request.state, "user_id", None)
+    user_model = None
+    user_provider = None
+
+    # Load user preference from DB
+    if user_id:
+        try:
+            from db.engine import AsyncSessionLocal
+            from db.models import UserPreferenceModel
+            from sqlalchemy import select
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(UserPreferenceModel).where(UserPreferenceModel.user_id == user_id)
+                )
+                pref = result.scalar_one_or_none()
+                if pref:
+                    user_model = pref.active_model
+                    user_provider = pref.active_provider
+        except Exception:
+            pass  # Fall back to global defaults
+
+    return LLMClient(
+        user_plan=user_plan,
+        user_model=user_model,
+        user_provider=user_provider,
+    )
+
+
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, req: FastRequest):
     """
     Endpoint de chat — roteado pela nova arquitetura unificada:
       - Com fontes conectadas: NL2SQL / RAG / Hybrid via QueryRouter
       - Sem fontes: resposta LLM direta com orientação
     """
     try:
+        # Check and increment LLM quota
+        user_id = getattr(req.state, "user_id", None)
+        user_plan = getattr(req.state, "user_plan", "free")
+        has_quota = await check_and_increment_quota(user_id, user_plan) if user_id else True
+        if not has_quota:
+            raise HTTPException(
+                status_code=429,
+                detail="Cota mensal de LLM excedida. Faça upgrade do seu plano para continuar."
+            )
+
+        # Build per-user LLM client
+        user_llm = await _get_user_llm(req)
+
         conversation_id = request.conversation_id or conversation_store.create_conversation()
         conversation_store.add_message(conversation_id, role="user", content=request.query)
 
@@ -104,7 +149,7 @@ async def chat(request: ChatRequest):
             if active_sources:
                 names = ", ".join(s.name for s in active_sources[:5])
                 ctx_hint = f"\n\nFontes de dados conectadas: {names}."
-            resp = _llm.chat(
+            resp = user_llm.chat(
                 system=_FALLBACK_SYSTEM,
                 user=request.query + ctx_hint,
                 temperature=0.4,

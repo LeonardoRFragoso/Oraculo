@@ -1,6 +1,7 @@
-import { MessageSquare, BarChart3, Upload, Trash2, Plus, Database, Bell, Share2, Cpu, History } from 'lucide-react'
+import { MessageSquare, BarChart3, Upload, Trash2, Plus, Database, Bell, Share2, Cpu, History, Shield } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useChat } from '../contexts/ChatContext'
+import { useAuth } from '../contexts/AuthContext'
 import { useState } from 'react'
 import { uploadFile } from '../services/api'
 import toast from 'react-hot-toast'
@@ -10,6 +11,7 @@ export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { clearMessages, messages, conversationId, setConversationId } = useChat()
+  const { user } = useAuth()
   const [showUpload, setShowUpload] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -23,6 +25,7 @@ export default function Sidebar() {
     { path: '/alerts', icon: Bell, label: 'Alertas & Ações' },
     { path: '/graph', icon: Share2, label: 'Knowledge Graph' },
     { path: '/models', icon: Cpu, label: 'Modelos' },
+    ...(user?.is_admin ? [{ path: '/admin', icon: Shield, label: 'Administração' }] : []),
   ]
 
   const handleNewChat = () => {

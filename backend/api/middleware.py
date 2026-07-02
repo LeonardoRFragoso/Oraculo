@@ -96,8 +96,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
             payload = _auth.decode_token(token)
             if payload is None:
                 raise ValueError("Token inválido ou expirado")
-            # Injetar username no state para uso nos routers
+            # Injetar dados do usuário no state para uso nos routers
             request.state.username = payload.get("sub")
+            request.state.user_id = payload.get("user_id")
+            request.state.user_plan = payload.get("plan", "free")
         except Exception as e:
             logger.warning(f"Auth falhou para {request.url.path}: {e}")
             resp = Response(

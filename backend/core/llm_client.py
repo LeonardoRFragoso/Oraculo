@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from .model_config import active_model
+from .plan_config import is_model_allowed, get_default_provider, get_allowed_models
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,9 @@ class LLMClient:
         self,
         prefer: str = "auto",    # "auto" | "anthropic" | "openai" | "opencode" | "zai"
         model_override: Optional[str] = None,
+        user_plan: str = "free",
+        user_model: Optional[str] = None,
+        user_provider: Optional[str] = None,
     ):
         self._anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
         self._openai_key = os.getenv("OPENAI_API_KEY", "")
@@ -66,10 +70,32 @@ class LLMClient:
         self._zai_base_url = os.getenv(
             "ZAI_BASE_URL", "https://api.z.ai/api/paas/v4"
         )
-        self._prefer = os.getenv("LLM_PROVIDER", prefer)
-        self._model_override = model_override
+        self._user_plan = user_plan
+        self._user_model = user_model
+        self._user_provider = user_provider
+
+        # If user has a specific provider preference, use it
+        if user_provider and user_provider != "auto":
+            self._prefer = user_provider
+        else:
+            self._prefer = os.getenv("LLM_PROVIDER", prefer)
+
+        # If user has a specific model, validate it against their plan
+        if user_model:
+            provider_for_model = self._infer_provider_from_model(user_model)
+            if is_model_allowed(user_plan, provider_for_model, user_model):
+                self._model_override = user_model
+            else:
+                logger.warning(
+                    f"Model '{user_model}' not allowed for plan '{user_plan}', "
+                    f"falling back to plan default"
+                )
+                self._model_override = self._best_model_for_plan(user_plan, provider_for_model)
+        else:
+            self._model_override = model_override
+
         self._provider = self._resolve_provider()
-        logger.info(f"LLMClient initialized: provider={self._provider}")
+        logger.info(f"LLMClient initialized: provider={self._provider}, plan={user_plan}, model={self._model_override or 'default'}")
 
     def _resolve_provider(self) -> str:
         if self._prefer == "anthropic" and self._anthropic_key:
@@ -97,6 +123,24 @@ class LLMClient:
             "OPENCODE_API_KEY or ZAI_API_KEY in .env. Chat will be unavailable until then."
         )
         return "none"
+
+    @staticmethod
+    def _infer_provider_from_model(model_id: str) -> str:
+        """Infers the provider from the model id prefix."""
+        if model_id.startswith("opencode/"):
+            return "opencode"
+        if model_id.startswith("glm-"):
+            return "zai"
+        if model_id.startswith("claude-"):
+            return "anthropic"
+        if model_id.startswith("gpt-"):
+            return "openai"
+        return "zai"
+
+    def _best_model_for_plan(self, plan: str, provider: str) -> Optional[str]:
+        """Returns the best (first) allowed model for the plan and provider."""
+        allowed = get_allowed_models(plan, provider)
+        return allowed[0] if allowed else None
 
     @property
     def provider(self) -> str:

@@ -66,6 +66,7 @@ class AuthService:
                 "hashed_password": self.get_password_hash("admin123"),
                 "is_active": True,
                 "is_admin": True,
+                "plan": "enterprise",
                 "created_at": datetime.now().isoformat()
             }
         }
@@ -199,6 +200,7 @@ class AuthService:
             "hashed_password": self.get_password_hash(password),
             "is_active": True,
             "is_admin": False,
+            "plan": "free",
             "created_at": datetime.now().isoformat()
         }
         
@@ -228,7 +230,7 @@ class AuthService:
             raise ValueError(f"Usuário '{username}' não encontrado")
         
         # Campos permitidos para atualização
-        allowed_fields = ['email', 'full_name', 'is_active']
+        allowed_fields = ['email', 'full_name', 'is_active', 'plan', 'plan_expires_at', 'llm_quota_monthly']
         
         for field, value in updates.items():
             if field in allowed_fields:
@@ -296,6 +298,10 @@ class AuthService:
                 'full_name': user.get('full_name'),
                 'is_active': user.get('is_active', True),
                 'is_admin': user.get('is_admin', False),
+                'plan': user.get('plan', 'free'),
+                'plan_expires_at': user.get('plan_expires_at'),
+                'llm_quota_monthly': user.get('llm_quota_monthly', 100),
+                'llm_quota_used': user.get('llm_quota_used', 0),
                 'created_at': user.get('created_at')
             }
             for user in self.users.values()

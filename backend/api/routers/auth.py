@@ -36,6 +36,7 @@ class UserResponse(BaseModel):
     full_name: str
     is_active: bool
     is_admin: bool
+    plan: str = "free"
 
 
 class Token(BaseModel):
@@ -92,7 +93,8 @@ async def register(user_data: UserRegister):
             email=user['email'],
             full_name=user['full_name'],
             is_active=user['is_active'],
-            is_admin=user.get('is_admin', False)
+            is_admin=user.get('is_admin', False),
+            plan=user.get('plan', 'free'),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -115,9 +117,13 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Criar token
+    # Criar token com plan embutido
     access_token = auth_service.create_access_token(
-        data={"sub": user['username'], "user_id": user['id']}
+        data={
+            "sub": user['username'],
+            "user_id": user['id'],
+            "plan": user.get('plan', 'free'),
+        }
     )
     
     return Token(
@@ -129,7 +135,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             email=user['email'],
             full_name=user['full_name'],
             is_active=user['is_active'],
-            is_admin=user.get('is_admin', False)
+            is_admin=user.get('is_admin', False),
+            plan=user.get('plan', 'free'),
         )
     )
 
@@ -145,7 +152,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         email=current_user['email'],
         full_name=current_user['full_name'],
         is_active=current_user['is_active'],
-        is_admin=current_user.get('is_admin', False)
+        is_admin=current_user.get('is_admin', False),
+        plan=current_user.get('plan', 'free'),
     )
 
 
@@ -216,3 +224,80 @@ async def delete_user(
         )
     
     return {"success": True, "message": f"Usuário '{username}' deletado com sucesso"}
+
+
+# ── Admin: Plan management ────────────────────────────────────────────────────
+
+class UpdatePlanRequest(BaseModel):
+    plan: str  # free | premium | enterprise
+    plan_expires_at: Optional[str] = None
+    llm_quota_monthly: Optional[int] = None
+
+
+@router.put("/auth/users/{username}/plan")
+async def update_user_plan(
+    username: str,
+    body: UpdatePlanRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Atualiza plano do usuário (apenas admin).
+    """
+    if not current_user.get('is_admin', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores."
+        )
+
+    valid_plans = {"free", "premium", "enterprise"}
+    if body.plan not in valid_plans:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Plano inválido. Valores permitidos: {', '.join(valid_plans)}"
+        )
+
+    from core.plan_config import PLAN_QUOTAS
+    updates = {"plan": body.plan}
+    if body.plan_expires_at:
+        updates["plan_expires_at"] = body.plan_expires_at
+    if body.llm_quota_monthly is not None:
+        updates["llm_quota_monthly"] = body.llm_quota_monthly
+    else:
+        updates["llm_quota_monthly"] = PLAN_QUOTAS.get(body.plan, 100)
+
+    try:
+        updated = auth_service.update_user(username, updates)
+        return {
+            "success": True,
+            "username": updated['username'],
+            "plan": updated.get('plan', 'free'),
+            "llm_quota_monthly": updated.get('llm_quota_monthly', 100),
+            "message": f"Plano do usuário '{username}' atualizado para '{body.plan}'"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/auth/users/{username}/quota/reset")
+async def reset_user_quota(
+    username: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Reseta a quota de LLM do usuário (apenas admin).
+    """
+    if not current_user.get('is_admin', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores."
+        )
+
+    try:
+        auth_service.update_user(username, {"llm_quota_used": 0})
+        return {
+            "success": True,
+            "username": username,
+            "message": f"Quota do usuário '{username}' resetada."
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

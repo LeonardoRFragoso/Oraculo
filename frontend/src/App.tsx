@@ -12,6 +12,7 @@ import DataSourcesPage from './pages/DataSourcesPage'
 import AlertsPage from './pages/AlertsPage'
 import GraphPage from './pages/GraphPage'
 import ModelsPage from './pages/ModelsPage'
+import AdminPage from './pages/AdminPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
                 <Route path="graph" element={<GraphPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="models" element={<ModelsPage />} />
+                <Route path="admin" element={<AdminPage />} />
               </Route>
             </Routes>
           </Router>
