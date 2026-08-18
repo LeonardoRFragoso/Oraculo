@@ -1,8 +1,8 @@
-# 🔮 Oráculo — Plataforma Universal de Inteligência Corporativa
+# 🔮 Oráculo — Plataforma de Inteligência sobre Dados
 
-**Oráculo** é uma plataforma enterprise de inteligência sobre dados — conecta qualquer fonte de dados, entende o contexto de negócio automaticamente, responde perguntas em linguagem natural, detecta anomalias, gera insights proativos e executa ações autônomas.
+**Oráculo** é uma plataforma de inteligência sobre dados que conecta fontes heterogêneas, entende o contexto de negócio automaticamente, responde perguntas em linguagem natural, detecta anomalias, gera insights proativos e executa ações autônomas.
 
-> Posicionamento: concorrente de Palantir / Databricks / Snowflake. Não é um chatbot.
+> **Nota de posicionamento:** O Oráculo explora conceitos inspirados em plataformas de data intelligence (Palantir, Databricks, Snowflake) como referência de categoria, mas é um projeto independente em estágio de desenvolvimento — não é equivalente em escala, maturidade ou capacidade a essas plataformas.
 
 ---
 
@@ -332,6 +332,20 @@ docker-compose exec backend python scripts/migrate_json_to_pg.py
 ## 📄 Licença
 
 MIT
+
+---
+
+## 📌 Limitações e Maturidade
+
+- **Estágio:** projeto em desenvolvimento ativo, não é production-ready
+- **Sem CI/CD:** não há workflows de GitHub Actions configurados
+- **Testes:** 7 arquivos de teste (auth, nl2sql, connectors, llm_client, models, plans, openrag) — cobertura limitada
+- **Sem demo pública:** não há URL de demo disponível
+- **NL2SQL:** funciona com perguntas em português mas pode falhar em consultas complexas
+- **RAG:** FAISS per-source com fallback TF-IDF (sem API key) — qualidade de retrieval limitada sem embeddings de LLM
+- **Knowledge Graph:** extração de entidades baseada em regras, não em NLP avançado
+- **Conectores MongoDB, S3 e REST API:** planejados, não implementados
+- **Multi-usuário:** auth JWT implementada mas sem RBAC granular
 
 ---
 
